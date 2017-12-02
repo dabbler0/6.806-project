@@ -13,9 +13,11 @@ class Vocabulary:
             for line in vocab_file:
                 word = line[:line.index(' ')]
                 vector = [int(x) for x in line[line.index(' '):].split(' ')]
+                vector.append(1) # The extra dimension indicates that this is not a padding vector.
                 self.word_to_idx[word] = len(self.vocabulary)
                 self.vocabulary.append(word)
                 self.embedding.append(vector)
+        self. 
 
 '''
 Question datasets
@@ -34,18 +36,20 @@ class Question:
         self.body = body
 
 class QuestionDataset(Dataset):
-    def __init__(self, train, questions, vocabulary):
+    def __init__(self, train, questions, vocabulary, truncate_length):
         self.questions = {}
         self.entries = []
         self.vocabulary = vocabulary
 
         with open(questions) as question_file:
-            for line in questisons:
+            for line in questions:
                 qid, title, body = line.split('\t')
                 qid = int(qid)
 
                 title = [vocabulary.word_to_idx[t] for t in title.split(' ')]
                 body = [vocabulary.word_to_idx[t] for t in body.split(' ')]
+
+                if len(title) > 250:
 
                 self.questions[qid] = Question(qid, title, body)
 

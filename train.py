@@ -46,6 +46,9 @@ def train(embedder,
     for epoch in range(epochs):
         final_loss = 0.0
         loss_denominator = 0.0
+
+        master.train()
+
         for i, batch in enumerate(tqdm(train_loader)):
             # The batch will be an array of SimilarityEntry objects.
             # We need to merge these into appropriate LongTensor vectors.
@@ -67,6 +70,8 @@ def train(embedder,
             # Step
             optimizer.step()
 
+        master.eval()
+
         # Run test
         test_error = tester.mean_average_precision(full_embedder)
 
@@ -77,7 +82,7 @@ train(
     LSTMAverage(),
     #LSTMLast(),
     batch_size = 200,
-    lr = 1e-4, #0.00001,
+    lr = 0.00001,
     truncate_length = 40,
-    margin = 0.01
+    margin = 0.2
 )

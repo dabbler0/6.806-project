@@ -58,7 +58,7 @@ class CosineSimilarityMaster(nn.Module):
         # The similarities should be of size batch_size and batch_size x 20
         # Take maximum similarity
         maximum_random_similarity, _indices = torch.max(random_similarity, 1)
-        #mean_random_similarity = random_similarity.mean(1)
+        #maximum_random_similarity = random_similarity.mean(1)
 
         # Add hinge loss
         maximum_random_similarity += margin

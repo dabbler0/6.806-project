@@ -21,7 +21,7 @@ class LSTMAverage(nn.Module):
             input_size = 202,
             hidden_size = 240,
             num_layers = 1,
-            dropout = 0.3,
+            dropout = 0.7,
             #bidirectional = True,
             batch_first = True)
 
@@ -29,8 +29,15 @@ class LSTMAverage(nn.Module):
         # LSTM
         output, (h, c) = self.lstm(batch)
 
-        # Average LSTM representation
-        return output.mean(1)
+        # batch is of size (batch) x (seq_length) x (word_embedding)
+        # word_embedding[-2] (that's index 200) is going to be equal to 0 when
+        # it is a padding sequence.
+        padding_mask = batch[:, :, 200]
+        # (padding_mask is now of size (batch) x (seq_length))
+
+        # Get mean ignoring things past the end of the
+        # sentence.
+        return (padding_mask.unsqueeze(2) * output).sum(1) / padding_mask.sum(1).unsqueeze(1)
 
 class LSTMLast(nn.Module):
     def __init__(self):

@@ -53,7 +53,7 @@ class FullEmbedder(nn.Module):
 
     def regularizer(self):
         if self.merge_strategy == 'linear':
-            return self.merge_linear.weight.norm(1)
+            return self.merge_linear.weight.norm(0.5)
         return 0
 
 class CosineSimilarityMaster(nn.Module):

@@ -16,6 +16,19 @@ class AverageEmbedding(nn.Module):
     def forward(self, batch):
         return F.relu(self.linear(batch.mean(1)))
 
+class CNN(nn.Module):
+    def __init__(self):
+        super(CNN, self).__init__()
+        self.tan = nn.Tanh()
+        self.conv = nn.Conv1d(202, 667, kernel_size=3, padding=1)
+        # self.pooling = nn.AvgPool1d(667)
+
+
+    def forward(self, x):
+        x = self.conv(x)
+        x = self.tan(x)
+        return x
+
 class LSTMAverage(nn.Module):
     def output_size(self):
         return self.hidden_size * (2 if self.bidirectional else 1)

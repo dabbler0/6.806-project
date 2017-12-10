@@ -14,7 +14,7 @@ from torch.autograd import Variable
 import os
 import json
 
-version = 'second_versioned; more_negative_examples'
+version = 'third_versioned; batchnorm'
 
 # Hyperparameters
 def train(embedder,
@@ -150,18 +150,19 @@ def train(embedder,
         print('Epoch %d: train hinge loss %f, test MAP %0.1f' % (epoch, final_loss / loss_denominator, int(test_error * 1000) / 10.0))
 
 train(
-    GRUAverage(bidirectional = True, hidden_size = 100), #False),
-    'models/gru-bidirectional-linear-actual-l1',
-    batch_size = 200,
+    GRUAverage(bidirectional = True, hidden_size = 115), #False),
+    'models/gru-bidirectional-mean-noreg-longbody-batchnorm-50epochs',
+    batch_size = 100,
     lr = 1e-4,
 
     title_length = 40,
     negative_samples = 20,
+    alpha = 0,
 
-    body_embedder = GRUAverage(bidirectional = True, hidden_size = 100),
-    body_length = 40,
-    merge_strategy = 'linear',
-    output_embedding_size = 200,
+    body_embedder = GRUAverage(bidirectional = True, hidden_size = 115),
+    body_length = 100,
+    merge_strategy = 'mean',
+    output_embedding_size = 400,
 
     epochs = 50,
     margin = 0.2

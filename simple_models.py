@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.utils.rnn as rnn
 
+import math
+
 from data import word_embedding_size
 
 class AverageEmbedding(nn.Module):
@@ -168,3 +170,119 @@ class GRUAverage(nn.Module):
         output = output[inverse_indices.data, :]
 
         return output
+
+def AttentionIsAllYouNeed(nn.Module):
+    def __init__(self, heads, output_size = 200, key_size = 64, value_size = 64):
+        self.heads = heads
+        self.output_size = output_size
+        self.key_size = key_size
+        self.value_size = value_size
+
+        # The initial transform, which generates
+        # all the queries, keys, and values.
+        self.initial_transform = nn.Linear(
+            202,
+            self.heads * (2 * key_size + value_size)
+        )
+
+        # The merge transform, which takes the multiple
+        # attention heads and produces the output encoding
+        self.merge_transform = nn.Linear(
+            self.heads * value_size,
+            self.output_size
+        )
+
+        self.frequency_matrix = torch.pow(
+            1e-4, torch.arange(1, 11) / 10).view(1, -1)
+
+    def output_size(self):
+        return self.output_size
+
+    def signature(self):
+        return {
+            'type': 'AttenionIsAllYouNeed',
+            'output_size': self.output_size,
+            'heads': self.heads,
+            'positional_encodings': 10,
+            'key_size': self.key_size,
+            'value_size': self.value_size
+        }
+
+    def forward(self, batch):
+        # batch will be of size (batch_size) x (seq_length) x (embedding_size)
+        # We will perform a self-attention embedding.
+        # We want to compute (head) keys, values and queries for each word.
+
+        padding_mask = batch[:, :, 200]
+
+        key_size, value_size, heads = self.key_size, self.value_size, self.heads
+
+        batch_size, seq_length, embedding_size = batch.size()
+        pos_size = self.frequency_matrix.size()[1]
+
+        # Positional encoding
+        positions = torch.arange(0, seq_length).view(
+            1, seq_length, 1)
+        position_ratios = torch.torch.mm(positions, self.frequency_matrix))
+        sin_encoding = torch.sin(position_ratios).expand(batch_size, seq_length, pos_size)
+        cos_encoding = torch.cos(position_ratios).expand(batch_size, seq_length, pos_size)
+        batch = torch.cat([batch, sin_encoding, cos_encoding], dim = 3)
+
+        # Update embedding size to match embedding with positional encoding
+        embedding_size += pos_size * 2
+
+        # Get queries, keys, values
+        all_info = self.initial_transform(
+            batch.view(-1, embedding_size)).view(batch_size, seq_length, -1)
+
+        # Each of these should be (batch_size) x (seq_length) x (heads) x (dim)
+        queries = all_info[:, :, :(self.heads * key_size)]
+        keys = all_info[:, :, (self.heads * key_size):(self.heads * key_size) * 2]
+        values = all_info[:, :, -(self.heads * value_size):]
+
+        queries = queries.view(batch_size, seq_length, heads, key_size)
+        keys = queries.view(batch_size, seq_length, heads, key_size)
+        values = queries.view(batch_size, seq_length, heads, value_size)
+
+        # Batched matrix multiplication to get query-key similarity.
+        # We need to transpose queries and keys to put heads first,
+        # so that we can batch them properly.
+        queries = queries.transpose(1, 2).copy()
+        keys = queries.transpose(1, 2).copy()
+        values = queries.transpose(1, 2).copy()
+
+        # Get attentions
+        attentions = torch.bmm(
+            queries.view(-1, seq_length, key_size),
+            keys.view(-1, seq_length, key_size)
+        ).view(batch_size, heads, seq_length, seq_length)
+
+        # "Scaled dot-product attention"
+        attentions /= math.sqrt(key_size)
+
+        # Softmax over the last dimension
+        attentions = F.softmax(attentions, dim = 3)
+
+        # Mask out padding vectors
+        attentions *= padding_mask.unsqueeze(1).unsqueeze(1).expand_as(attentions)
+        attentions /= attentions.sum(dim = 3).unsqueeze(3).expand_as(attentions)
+
+        # Apply attention to values
+        # This should produce a matrix of size (batch_size) x (heads) x (seq_len) x (value_dim)
+        aggregations = torch.bmm(
+            attentions.view(-1, seq_length, seq_length),
+            values.view(-1, seq_length, value_size)
+        ).view(batch_size, heads, seq_length, value_size)
+
+        # Re-concatenate all of the aggregations
+        aggregations = aggregations.transpose(1, 2).copy().view(batch_size, seq_length, -1)
+
+        # Merge transform, yielding (batch_size) x (seq_len) x (embedding_size)
+        embeddings = self.merge_transform(
+            aggregations.view(batch_size * seq_length, -1)).view(batch_size, seq_length, -1)
+
+        # Average embedding
+        return (
+            (embeddings * padding_mask.unsqueeze(2).expand_as(embeddings)).sum(1) /
+            padding_mask.sum(1).unsqueeze(1).expand(batch_size, self.output_size)
+        )

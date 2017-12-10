@@ -33,6 +33,12 @@ class FullEmbedder(nn.Module):
 
         if self.merge_strategy == 'linear':
             self.merge_linear = nn.Linear(total_size, output_embedding_size, bias = False)
+        elif self.merge_strategy == 'concatenate':
+            output_embedding_size = total_size
+        elif self.merge_strategy == 'mean':
+            output_embedding_size = title_embedding.output_size()
+
+        self.batch_norm = nn.BatchNorm1d(output_embedding_size)
 
     def forward(self, pair):
         title, body = pair
@@ -43,13 +49,15 @@ class FullEmbedder(nn.Module):
 
             # Combine title and body encodings
             if self.merge_strategy == 'concatenate':
-                return torch.cat([title_encodings, body_encodings], dim = 1)
+                result = torch.cat([title_encodings, body_encodings], dim = 1)
             elif self.merge_strategy == 'linear':
-                return self.merge_linear(torch.cat([title_encodings, body_encodings], dim = 1))
+                result = self.merge_linear(torch.cat([title_encodings, body_encodings], dim = 1))
             elif self.merge_strategy == 'mean':
-                return (title_encodings + body_encodings) / 2
+                result = (title_encodings + body_encodings) / 2
         else:
-            return self.title_embedding(self.word_embedding(title))
+            result = self.title_embedding(self.word_embedding(title))
+
+        return self.batch_norm(result)
 
     def regularizer(self):
         if self.merge_strategy == 'linear':

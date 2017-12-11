@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import numpy as np
 
 from data import *
 
@@ -92,11 +93,11 @@ class TestFramework:
             for x in self.test_set.entries
         ]
 
-        if cuda:
-            self.question_vector = self.question_vector.cuda()
-            self.full_vector = self.full_vector.cuda()
+        # if cuda:
+        #     self.question_vector = self.question_vector.cuda()
+        #     self.full_vector = self.full_vector.cuda()
 
-    def mean_average_precision(self, embedder):
+    def metrics(self, embedder):
         # Get embeddings for all the questions
         # (cases) x (sent_embedding_size)
         question_embedding = embedder(self.question_vector)
@@ -120,7 +121,11 @@ class TestFramework:
 
         # Now, just in interpreted Python, determine MAP.
         mean_average_precision = 0.0
+        mean_reciprocal_rank = 0.0
+        precision_at_5n = np.zeros(5)
+
         samples = 0
+        total_samples = 0
         for i, case in enumerate(indices):
             avg_precision = 0.0
             num_recalls = 0.0
@@ -128,6 +133,10 @@ class TestFramework:
             correct_so_far = 0.0
             total_so_far = 0.0
 
+            reciprocal_rank = 0.0
+            precision_at_case_5n = np.zeros(5)
+
+            first_examined = False
             for j, candidate in enumerate(case):
                 candidate = candidate.data[0]
                 total_so_far += 1
@@ -135,11 +144,20 @@ class TestFramework:
                     # For each new possible recall, get precision
                     correct_so_far += 1
                     avg_precision += (correct_so_far / total_so_far)
+                    if not first_examined:
+                        reciprocal_rank = 1/float(total_so_far)
+                        first_examined = True
                     num_recalls += 1
+
+                if j < 5:
+                    precision_at_case_5n[j] = num_recalls/total_so_far
+
 
             if num_recalls > 0:
                 avg_precision /= num_recalls
                 mean_average_precision += avg_precision
+                mean_reciprocal_rank += reciprocal_rank
+                precision_at_5n = np.sum((precision_at_5n, precision_at_case_5n), axis=0)
                 samples += 1
 
-        return mean_average_precision / samples
+        return (mean_average_precision / samples, mean_reciprocal_rank / samples, precision_at_5n / samples)

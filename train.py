@@ -14,9 +14,9 @@ from torch.autograd import Variable
 # Hyperparameters
 def train(embedder,
             truncate_length = 40,
-            batch_size = 100,
+            batch_size = 50,
             margin = 0.1,
-            epochs = 50,
+            epochs = 100,
             lr = 0.0001,
             cuda = True,
             vectors = 'askubuntu/vector/vectors_pruned.200.txt',
@@ -26,6 +26,7 @@ def train(embedder,
 
     vocabulary = Vocabulary(vectors)
     questions = QuestionBase(questions, vocabulary, truncate_length)
+
 
     train_loader = DataLoader(
         TrainSet(train_set, questions),
@@ -39,8 +40,8 @@ def train(embedder,
     tester = TestFramework(dev_set, questions, truncate_length)
     master = CosineSimilarityMaster(full_embedder, truncate_length, margin)
 
-    if cuda:
-        master = master.cuda()
+    # if cuda:
+    #     master = master.cuda()
     optimizer = optim.Adam([param for param in master.parameters() if param.requires_grad], lr = lr)
 
     for epoch in range(epochs):
@@ -48,16 +49,15 @@ def train(embedder,
         loss_denominator = 0.0
 
         master.train()
-
-        for i, batch in enumerate(tqdm(train_loader)):
+        for batch in tqdm(train_loader):
             # The batch will be an array of SimilarityEntry objects.
             # We need to merge these into appropriate LongTensor vectors.
 
             q, similar, random = torch.stack(batch['q']), torch.stack(batch['similar']), torch.stack(batch['random'])
 
             # Transfer to GPU
-            if cuda:
-                q, similar, random = q.cuda(), similar.cuda(), random.cuda()
+            # if cuda:
+            #     q, similar, random = q.cuda(), similar.cuda(), random.cuda()
 
             q, similar, random = Variable(q), Variable(similar), Variable(random)
 
@@ -73,15 +73,14 @@ def train(embedder,
         master.eval()
 
         # Run test
-        test_error = tester.mean_average_precision(full_embedder)
-
-        print('Epoch %d: train hinge loss %f, test MAP %f' % (epoch, final_loss / loss_denominator, test_error))
+        mean_average_precision, mean_reciprocal_rank, precision_at_n = tester.metrics(full_embedder)
+        print('Epoch %d: train hinge loss = %f, test MAP = %f, test MRR = %f \n, precision@1 = %f, precision@5 = %f' % (epoch, final_loss / loss_denominator, mean_average_precision, mean_reciprocal_rank, precision_at_n[0], precision_at_n[4]))
 
 train(
     #AverageEmbedding(),
-    LSTMAverage(),
+    CNN(),
     #LSTMLast(),
-    batch_size = 200,
+    batch_size = 100,
     lr = 0.00001,
     truncate_length = 40,
     margin = 0.2

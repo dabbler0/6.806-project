@@ -20,10 +20,12 @@ class CNN(nn.Module):
         self.conv = nn.Conv1d(202, 667, kernel_size=3, padding=1)
         # self.pooling = nn.AvgPool1d(667)
 
-
     def forward(self, x):
+        x = x.transpose(1, 2)
+        padding_mask = x[:, 200, :]
         x = self.conv(x)
         x = self.tan(x)
+        x = (padding_mask.unsqueeze(2)*x.transpose(1, 2)).sum(1)/padding_mask.sum(1).unsqueeze(1)
         return x
 
 class LSTMAverage(nn.Module):

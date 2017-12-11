@@ -107,6 +107,7 @@ class TestSet:
         with open(test) as test_file:
             for line in tqdm(test_file, desc='load testset'):
                 q, similar, full = [
+                    #Question
                     [int(y) for y in x.split(' ') if len(y) > 0]
                     for x in line.split('\t')[:-1]
                 ]

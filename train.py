@@ -52,8 +52,8 @@ def train(embedder,
     tester = TestFramework(dev_set, questions, title_length, body_length)
     master = CosineSimilarityMaster(full_embedder, title_length, body_length, margin)
 
-    # if cuda:
-    #     master = master.cuda()
+     if cuda:
+         master = master.cuda()
     optimizer = optim.Adam([param for param in master.parameters() if param.requires_grad], lr = lr)
 
     # Get total number of parameters
@@ -103,10 +103,10 @@ def train(embedder,
         master.train()
 
         for i, batch in enumerate(tqdm(train_loader)):
-            # if cuda:
-            #     batchify = lambda v: Variable(torch.stack(v).cuda())
-            # else:
-            batchify = lambda v: Variable(torch.stack(v))
+             if cuda:
+                 batchify = lambda v: Variable(torch.stack(v).cuda())
+             else:
+                batchify = lambda v: Variable(torch.stack(v))
 
             _, random_indices = torch.rand(100).sort()
 
@@ -150,7 +150,7 @@ def train(embedder,
         print('Epoch %d: train hinge loss %f, test MAP %0.1f' % (epoch, final_loss / loss_denominator, int(test_error * 1000) / 10.0))
 
 train(
-    CNN(), #False),
+    CNN(),
     'models/cnn',
     batch_size = 100,
     lr = 1e-4,

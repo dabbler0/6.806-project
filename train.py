@@ -135,8 +135,10 @@ def train(embedder,
 
         master.eval()
 
-        # Run test
-        test_error = tester.mean_average_precision(full_embedder)
+                # Run test
+        mean_average_precision, mean_reciprocal_rank, precision_at_n = tester.metrics(full_embedder)
+        print('Epoch %d: train hinge loss = %f, test MAP = %f, test MRR = %f \n, precision@1 = %f, precision@5 = %f' % (epoch, final_loss / loss_denominator, mean_average_precision, mean_reciprocal_rank, precision_at_n[0], precision_at_n[4]))
+
 
         save_filename = os.path.join(save_dir, 'epoch%d-loss%f.pkl' % (epoch, test_error))
         fig_filename = os.path.join(save_dir, 'epoch%d-loss%f-vectors.png' % (epoch, test_error))

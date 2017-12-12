@@ -147,12 +147,12 @@ class TestFramework:
             for x in self.test_set.entries
         ]
 
-         if cuda:
-             self.question_title_vector = self.question_title_vector.cuda()
-             self.full_title_vector = self.full_title_vector.cuda()
+        if cuda:
+            self.question_title_vector = self.question_title_vector.cuda()
+            self.full_title_vector = self.full_title_vector.cuda()
 
-             self.question_body_vector = self.question_body_vector.cuda()
-             self.full_body_vector = self.full_body_vector.cuda()
+            self.question_body_vector = self.question_body_vector.cuda()
+            self.full_body_vector = self.full_body_vector.cuda()
 
         self.question_vector = (self.question_title_vector, self.question_body_vector)
 

@@ -52,8 +52,8 @@ def train(embedder,
     tester = TestFramework(dev_set, questions, title_length, body_length)
     master = CosineSimilarityMaster(full_embedder, title_length, body_length, margin)
 
-     if cuda:
-         master = master.cuda()
+    if cuda:
+        master = master.cuda()
     optimizer = optim.Adam([param for param in master.parameters() if param.requires_grad], lr = lr)
 
     # Get total number of parameters
@@ -103,14 +103,17 @@ def train(embedder,
         master.train()
 
         for i, batch in enumerate(tqdm(train_loader)):
-             if cuda:
-                 batchify = lambda v: Variable(torch.stack(v).cuda())
-             else:
+            if cuda:
+                batchify = lambda v: Variable(torch.stack(v).cuda())
+            else:
                 batchify = lambda v: Variable(torch.stack(v))
 
             _, random_indices = torch.rand(100).sort()
 
             indices = random_indices[:negative_samples]
+
+            if cuda:
+                indices = indices.cuda()
 
             # The batch will be an array of SimilarityEntry objects.
             # We need to merge these into appropriate LongTensor vectors.
@@ -135,12 +138,14 @@ def train(embedder,
 
         master.eval()
 
-                # Run test
+        # Run test
         mean_average_precision, mean_reciprocal_rank, precision_at_n = tester.metrics(full_embedder)
+
+        test_error = mean_reciprocal_rank
+
         print('Epoch %d: train hinge loss = %f, test MAP = %f, test MRR = %f \n, precision@1 = %f, precision@5 = %f' % (epoch, final_loss / loss_denominator, mean_average_precision, mean_reciprocal_rank, precision_at_n[0], precision_at_n[4]))
 
-
-        save_filename = os.path.join(save_dir, 'epoch%d-loss%f.pkl' % (epoch, test_error))
+        save_filename = os.path.join(save_dir, 'epoch%d-loss%f-map%f.pkl' % (epoch, test_error, mean_average_precision))
         fig_filename = os.path.join(save_dir, 'epoch%d-loss%f-vectors.png' % (epoch, test_error))
 
         tester.visualize_embeddings(full_embedder, fig_filename)
@@ -149,12 +154,12 @@ def train(embedder,
         if test_error > best_loss:
             torch.save(embedder, best_filename)
 
-        print('Epoch %d: train hinge loss %f, test MAP %0.1f' % (epoch, final_loss / loss_denominator, int(test_error * 1000) / 10.0))
+        print('Epoch %d: train hinge loss %f, test MRR %0.1f' % (epoch, final_loss / loss_denominator, int(test_error * 1000) / 10.0))
 
 train(
     CNN(),
     'models/cnn',
-    batch_size = 100,
+    batch_size = 200,
     lr = 1e-4,
 
     title_length = 40,

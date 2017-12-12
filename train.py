@@ -56,6 +56,8 @@ def train(embedder,
 
     optimizer = optim.Adam([param for param in master.parameters() if param.requires_grad], lr = lr)
 
+    print([param.size() for param in master.parameters() if param.requires_grad])
+
     # Get total number of parameters
     product = lambda x: x[0] * product(x[1:]) if len(x) > 1 else x[0]
     number_of_parameters = sum(product(param.size()) for param in master.parameters() if param.requires_grad)
@@ -143,15 +145,15 @@ def train(embedder,
 
         tester.visualize_embeddings(full_embedder, fig_filename)
 
-        torch.save(embedder, save_filename)
+        torch.save(full_embedder, save_filename)
         if test_error > best_loss:
-            torch.save(embedder, best_filename)
+            torch.save(full_embedder, best_filename)
 
         print('Epoch %d: train hinge loss %f, test MAP %0.1f' % (epoch, final_loss / loss_denominator, int(test_error * 1000) / 10.0))
 
 train(
-    GRUAverage(bidirectional = True, hidden_size = 115), #False),
-    'models/gru-bidirectional-mean-noreg-longbody-batchnorm-50epochs',
+    GRUAverage(hidden_size = 110),
+    'models/best-gru-model',
     batch_size = 100,
     lr = 1e-4,
 
@@ -159,10 +161,9 @@ train(
     negative_samples = 20,
     alpha = 0,
 
-    body_embedder = GRUAverage(bidirectional = True, hidden_size = 115),
+    body_embedder = GRUAverage(hidden_size = 110),
     body_length = 100,
-    merge_strategy = 'mean',
-    output_embedding_size = 400,
+    merge_strategy = 'concatenate',
 
     epochs = 50,
     margin = 0.2

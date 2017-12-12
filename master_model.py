@@ -37,6 +37,8 @@ class FullEmbedder(nn.Module):
             output_embedding_size = total_size
         elif self.merge_strategy == 'mean':
             output_embedding_size = title_embedding.output_size()
+        else:
+            raise Exception('Unrecognized merge strategy \'%s\'' % (merge_strategy,))
 
         self.batch_norm = nn.BatchNorm1d(output_embedding_size)
 
@@ -208,3 +210,6 @@ class TestFramework:
         question_embedding = embedder(self.question_vector)
         plt.matshow(question_embedding.data.cpu().numpy())
         plt.savefig(filename)
+
+    def sample(self, embedder):
+        return embedder(self.question_vector)

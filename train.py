@@ -150,15 +150,18 @@ def train(embedder,
 
         tester.visualize_embeddings(full_embedder, fig_filename)
 
-        torch.save(embedder, save_filename)
+        torch.save(full_embedder, save_filename)
         if test_error > best_loss:
-            torch.save(embedder, best_filename)
+            torch.save(full_embedder, best_filename)
 
         print('Epoch %d: train hinge loss %f, test MRR %0.1f' % (epoch, final_loss / loss_denominator, int(test_error * 1000) / 10.0))
 
+
+cnn_model = CNN()
+
 train(
-    CNN(),
-    'models/cnn',
+    cnn_model,
+    'models/cnn-unified-mean',
     batch_size = 200,
     lr = 1e-4,
 
@@ -166,7 +169,7 @@ train(
     negative_samples = 20,
     alpha = 0,
 
-    body_embedder = CNN(),
+    body_embedder = cnn_model,
     body_length = 100,
     merge_strategy = 'mean',
     output_embedding_size = 400,

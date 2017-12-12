@@ -56,6 +56,8 @@ def train(embedder,
         master = master.cuda()
     optimizer = optim.Adam([param for param in master.parameters() if param.requires_grad], lr = lr)
 
+    print([param.size() for param in master.parameters() if param.requires_grad])
+
     # Get total number of parameters
     product = lambda x: x[0] * product(x[1:]) if len(x) > 1 else x[0]
     number_of_parameters = sum(product(param.size()) for param in master.parameters() if param.requires_grad)
@@ -171,8 +173,7 @@ train(
 
     body_embedder = cnn_model,
     body_length = 100,
-    merge_strategy = 'mean',
-    output_embedding_size = 400,
+    merge_strategy = 'concatenate',
 
     epochs = 50,
     margin = 0.2

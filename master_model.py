@@ -4,6 +4,7 @@ import torch.nn.functional as F
 import numpy as np
 
 from data import *
+from meter import *
 
 import matplotlib
 matplotlib.use('Agg')
@@ -137,6 +138,7 @@ class TestFramework:
             [self.test_set.questions[y][0] for y in x['full']]
             for x in self.test_set.entries
         ])
+
         self.full_body_vector = torch.LongTensor([
             [self.test_set.questions[y][1] for y in x['full']]
             for x in self.test_set.entries
@@ -156,7 +158,48 @@ class TestFramework:
 
         self.question_vector = (self.question_title_vector, self.question_body_vector)
 
-    def metrics(self, embedder):
+class TestFramework:
+    def __init__(self, test, questions, title_length, body_length, cuda = True):
+        self.test_set = TestSet(test, questions)
+
+        self.title_length = title_length
+        self.body_length = body_length
+
+        self.cos_similarity = nn.CosineSimilarity(dim=2, eps=1e-6)
+
+        # LongTensor of (cases) x (trunc_length)
+        self.question_title_vector = torch.LongTensor([
+            self.test_set.questions[x['q']][0] for x in self.test_set.entries
+        ])
+        self.question_body_vector = torch.LongTensor([
+            self.test_set.questions[x['q']][1] for x in self.test_set.entries
+        ])
+
+        # LongTensor of (cases) x (num_full) x (trunc_length)
+        self.full_title_vector = torch.LongTensor([
+            [self.test_set.questions[y][0] for y in x['full']]
+            for x in self.test_set.entries
+        ])
+        self.full_body_vector = torch.LongTensor([
+            [self.test_set.questions[y][1] for y in x['full']]
+            for x in self.test_set.entries
+        ])
+
+        self.similar_sets = [
+            set(x['full'].index(i) for i in x['similar'] if i in x['full'])
+            for x in self.test_set.entries
+        ]
+
+        if cuda:
+            self.question_title_vector = self.question_title_vector.cuda()
+            self.full_title_vector = self.full_title_vector.cuda()
+
+            self.question_body_vector = self.question_body_vector.cuda()
+            self.full_body_vector = self.full_body_vector.cuda()
+
+        self.question_vector = (self.question_title_vector, self.question_body_vector)
+
+    def mean_average_precision(self, embedder):
         # Get embeddings for all the questions
         # (cases) x (sent_embedding_size)
         question_embedding = embedder(self.question_vector)
@@ -181,11 +224,7 @@ class TestFramework:
 
         # Now, just in interpreted Python, determine MAP.
         mean_average_precision = 0.0
-        mean_reciprocal_rank = 0.0
-        precision_at_5n = np.zeros(5)
-
         samples = 0
-        total_samples = 0
         for i, case in enumerate(indices):
             avg_precision = 0.0
             num_recalls = 0.0
@@ -193,10 +232,6 @@ class TestFramework:
             correct_so_far = 0.0
             total_so_far = 0.0
 
-            reciprocal_rank = 0.0
-            precision_at_case_5n = np.zeros(5)
-
-            first_examined = False
             for j, candidate in enumerate(case):
                 candidate = candidate.data[0]
                 total_so_far += 1
@@ -204,23 +239,121 @@ class TestFramework:
                     # For each new possible recall, get precision
                     correct_so_far += 1
                     avg_precision += (correct_so_far / total_so_far)
-                    if not first_examined:
-                        reciprocal_rank = 1/float(total_so_far)
-                        first_examined = True
                     num_recalls += 1
-
-                if j < 5:
-                    precision_at_case_5n[j] = num_recalls/total_so_far
-
 
             if num_recalls > 0:
                 avg_precision /= num_recalls
                 mean_average_precision += avg_precision
-                mean_reciprocal_rank += reciprocal_rank
-                precision_at_5n = np.sum((precision_at_5n, precision_at_case_5n), axis=0)
                 samples += 1
 
-        return (mean_average_precision / samples, mean_reciprocal_rank / samples, precision_at_5n / samples)
+        return mean_average_precision / samples
+
+    def visualize_embeddings(self, embedder, filename):
+        question_embedding = embedder(self.question_vector)
+        plt.matshow(question_embedding.data.cpu().numpy())
+        plt.savefig(filename)
+
+class AndroidTestFramework:
+    def __init__(self, test, questions, title_length, body_length, test_batch_size, cuda = True):
+        self.test_set = AndroidTestSet(test, questions)
+        self.batch_size = test_batch_size
+        self.test_loader = DataLoader(
+                AndroidTestSet(test, questions),
+                batch_size = self.batch_size,
+                shuffle = False,
+                drop_last = False
+        )
+        self.title_length = title_length
+        self.body_length = body_length
+
+        self.cos_similarity = nn.CosineSimilarity(dim=2, eps=1e-6)
+        self.AUC = AUCMeter()
+
+    def metrics(self, embedder):
+        # Get embeddings for all the questions
+        # (cases) x (sent_embedding_size)
+        self.AUC.reset()
+        for i, batch in enumerate(tqdm(self.test_loader)):
+
+            self.question_title_vector = torch.LongTensor([
+                self.test_set.questions[x][0] for x in batch['q']
+            ])
+
+            self.question_body_vector = torch.LongTensor([
+                self.test_set.questions[x][1] for x in batch['q']
+            ])
+
+            # LongTensor of (cases) x (num_full) x (trunc_length)
+            self.full_title_vector = torch.LongTensor([
+                [self.test_set.questions[y][0] for y in x]
+                for x in batch['full']
+            ]).transpose(0, 1).contiguous()
+
+
+            self.full_body_vector = torch.LongTensor([
+                [self.test_set.questions[y][1] for y in x]
+                for x in batch['full']
+            ]).transpose(0, 1).contiguous()
+
+            # LongTensor of (cases) x (num_full) x (trunc_length)
+            self.similar_title_vector = torch.LongTensor([
+                [self.test_set.questions[y][0] for y in x]
+                for x in batch['similar']
+            ]).transpose(0, 1).contiguous()
+
+
+            self.similar_body_vector = torch.LongTensor([
+                [self.test_set.questions[y][1] for y in x]
+                for x in batch['similar']
+            ]).transpose(0, 1).contiguous()
+
+            self.question_vector = (self.question_title_vector, self.question_body_vector)
+
+            self.similar_mask = torch.IntTensor([int(x) for x in batch['similar_mask']])
+            self.full_mask = torch.IntTensor([int(x) for x in batch['full_mask']])
+
+            question_embedding = embedder(self.question_vector)
+
+            full_size = self.full_title_vector.size()
+
+            # Want (cases) x (num_full) x (sent_embedding_size)
+            full_embedding = embedder(
+                (self.full_title_vector.view(-1, self.title_length),
+                self.full_body_vector.view(-1, self.body_length))
+            ).view(full_size[0], full_size[1], -1)
+
+            similar_size = self.similar_title_vector.size()
+            similar_embedding = embedder(
+                (self.similar_title_vector.view(-1, self.title_length),
+                self.similar_body_vector.view(-1, self.body_length))
+            ).view(similar_size[0], similar_size[1], -1)
+
+
+            # Get cosine similarities
+            full_similarities = self.cos_similarity(
+                question_embedding.unsqueeze(1).expand_as(full_embedding),
+                full_embedding
+            ).data.numpy()
+
+            similar_similarities = self.cos_similarity(
+                question_embedding.unsqueeze(1).expand_as(similar_embedding),
+                similar_embedding
+            ).data.numpy()
+
+
+            for i in range(len(full_similarities)):
+                curr_mask, curr_sim_mask = self.full_mask[i], self.similar_mask[i]
+                comb_similarities = torch.FloatTensor(
+                    np.concatenate((full_similarities[i][:curr_mask], similar_similarities[i][:curr_sim_mask]))
+                )
+                comb_target = torch.FloatTensor(
+                    np.concatenate(([0 for _ in range(curr_mask)], [1 for _ in range(curr_sim_mask)]))
+                )
+                self.AUC.add(comb_similarities, comb_target)
+
+        return self.AUC.value()
+
+
 
     def visualize_embeddings(self, embedder, filename):
         question_embedding = embedder(self.question_vector)

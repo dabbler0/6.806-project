@@ -52,13 +52,15 @@ class Question:
 
 class QuestionBase:
     def __init__(self, questions, vocabulary, title_length, body_length):
-        self.questions = {}
+        self.questions = {-1: ([0] * title_length, [0] * body_length)}
         self.vocabulary = vocabulary
         self.title_length = title_length
         self.body_length = body_length
 
         with open(questions) as question_file:
             for line in tqdm(question_file, desc='load questions'):
+                if len(line.split('\t')) != 3:
+                    print "error", line
                 qid, title, body = line.split('\t')
                 qid = int(qid)
 
@@ -129,3 +131,82 @@ class TestSet:
                     'similar': similar,
                     'full': full
                 })
+
+
+class AndroidTestSet:
+    def __init__(self, test_set, questions):
+        self.questions = questions
+        self.entries = []
+        self.pos_set, self.neg_set = test_set
+
+        neg_count = 0
+        previous_q = ''
+        previous_question = ''
+        current = ''
+        prev_random = []
+        neg_added = 0
+        with open(self.neg_set) as test_file:
+            for line in tqdm(test_file, desc='load testset'):
+                curr_q, curr_random = line.split(' ')
+                if curr_q == previous_q:
+                    prev_random.append(int(curr_random))
+
+                else:
+                    if neg_count != 0:
+                        added = len(prev_random)
+                        prev_random.extend([-1 for _ in range(300-len(prev_random))])
+                        self.entries.append({
+                            'full_mask': added,
+                            'current': previous_q,
+                            'q': prev_question,
+                            'full': prev_random
+                        })
+                    prev_question, prev_random = int(curr_q), [int(curr_random)]
+
+                previous_q = curr_q
+                neg_count += 1
+
+        added = len(prev_random)
+        prev_random.extend([-1 for _ in range(300-len(prev_random))])
+
+        self.entries.append({
+            'full_mask': added,
+            'current': previous_q,
+            'q': prev_question,
+            'full': prev_random
+        })
+
+        pos_count = 0
+        previous_q = ''
+        prev_similar = []
+        added = 0
+        with open(self.pos_set) as test_file:
+            for line in tqdm(test_file, desc='load testset'):
+                curr_q, curr_similar = line.split(' ')
+                if curr_q == previous_q:
+                    prev_similar.append(int(curr_similar))
+
+                else:
+                    if pos_count != 0:
+                        previous_length = len(prev_similar)
+                        prev_similar.extend([-1 for _ in range(3-len(prev_similar))])
+                        entry = self.entries[added]
+                        entry['similar'] = prev_similar
+                        entry['similar_mask'] = previous_length
+                        added += 1
+                    prev_similar = [int(curr_similar)]
+
+                previous_q = curr_q
+                pos_count += 1
+
+        previous_length = len(prev_similar)
+        prev_similar.extend([-1 for _ in range(3-len(prev_similar))])
+        entry = self.entries[added]
+        entry['similar'] = prev_similar
+        entry['similar_mask'] = previous_length
+
+    def __len__(self):
+        return len(self.entries)
+
+    def __getitem__(self, i):
+        return self.entries[i]

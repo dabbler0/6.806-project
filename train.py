@@ -25,7 +25,7 @@ def train(embedder,
             margin = 0.1,
             epochs = 50,
             lr = 1e-4,
-            cuda = True,
+            cuda = False,
             body_embedder = None,
             merge_strategy = 'mean',
             negative_samples = 20,
@@ -38,7 +38,6 @@ def train(embedder,
 
     vocabulary = Vocabulary(vectors)
     questions = QuestionBase(questions_filename, vocabulary, title_length, body_length)
-
 
     train_loader = DataLoader(
         TrainSet(train_set, questions),
@@ -54,6 +53,7 @@ def train(embedder,
 
     # if cuda:
     #     master = master.cuda()
+
     optimizer = optim.Adam([param for param in master.parameters() if param.requires_grad], lr = lr)
 
     # Get total number of parameters
@@ -133,28 +133,29 @@ def train(embedder,
             # Step
             optimizer.step()
 
+
         master.eval()
 
-                # Run test
+        # Run test
         mean_average_precision, mean_reciprocal_rank, precision_at_n = tester.metrics(full_embedder)
         print('Epoch %d: train hinge loss = %f, test MAP = %f, test MRR = %f \n, precision@1 = %f, precision@5 = %f' % (epoch, final_loss / loss_denominator, mean_average_precision, mean_reciprocal_rank, precision_at_n[0], precision_at_n[4]))
 
 
-        save_filename = os.path.join(save_dir, 'epoch%d-loss%f.pkl' % (epoch, test_error))
-        fig_filename = os.path.join(save_dir, 'epoch%d-loss%f-vectors.png' % (epoch, test_error))
+        save_filename = os.path.join(save_dir, 'epoch%d-loss%f.pkl' % (epoch, mean_average_precision))
+        fig_filename = os.path.join(save_dir, 'epoch%d-loss%f-vectors.png' % (epoch, mean_average_precision))
 
         tester.visualize_embeddings(full_embedder, fig_filename)
 
         torch.save(embedder, save_filename)
-        if test_error > best_loss:
+        if mean_average_precision > best_loss:
             torch.save(embedder, best_filename)
 
-        print('Epoch %d: train hinge loss %f, test MAP %0.1f' % (epoch, final_loss / loss_denominator, int(test_error * 1000) / 10.0))
+        print('Epoch %d: train hinge loss %f, test MAP %0.1f' % (epoch, final_loss / loss_denominator, int(mean_average_precision * 1000) / 10.0))
 
 train(
     CNN(), #False),
     'models/cnn',
-    batch_size = 100,
+    batch_size = 20,
     lr = 1e-4,
 
     title_length = 40,
@@ -166,6 +167,6 @@ train(
     merge_strategy = 'mean',
     output_embedding_size = 400,
 
-    epochs = 50,
+    epochs = 1,
     margin = 0.2
 )

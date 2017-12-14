@@ -149,12 +149,12 @@ class TestFramework:
             for x in self.test_set.entries
         ]
 
-        # if cuda:
-        #     self.question_title_vector = self.question_title_vector.cuda()
-        #     self.full_title_vector = self.full_title_vector.cuda()
-        #
-        #     self.question_body_vector = self.question_body_vector.cuda()
-        #     self.full_body_vector = self.full_body_vector.cuda()
+        if cuda:
+            self.question_title_vector = self.question_title_vector.cuda()
+            self.full_title_vector = self.full_title_vector.cuda()
+
+            self.question_body_vector = self.question_body_vector.cuda()
+            self.full_body_vector = self.full_body_vector.cuda()
 
         self.question_vector = (self.question_title_vector, self.question_body_vector)
 
@@ -277,35 +277,35 @@ class AndroidTestFramework:
 
             self.question_title_vector = torch.LongTensor([
                 self.test_set.questions[x][0] for x in batch['q']
-            ])
+            ]).cuda()
 
             self.question_body_vector = torch.LongTensor([
                 self.test_set.questions[x][1] for x in batch['q']
-            ])
+            ]).cuda()
 
             # LongTensor of (cases) x (num_full) x (trunc_length)
             self.full_title_vector = torch.LongTensor([
                 [self.test_set.questions[y][0] for y in x]
                 for x in batch['full']
-            ]).transpose(0, 1).contiguous()
+            ]).cuda().transpose(0, 1).contiguous()
 
 
             self.full_body_vector = torch.LongTensor([
                 [self.test_set.questions[y][1] for y in x]
                 for x in batch['full']
-            ]).transpose(0, 1).contiguous()
+            ]).cuda().transpose(0, 1).contiguous()
 
             # LongTensor of (cases) x (num_full) x (trunc_length)
             self.similar_title_vector = torch.LongTensor([
                 [self.test_set.questions[y][0] for y in x]
                 for x in batch['similar']
-            ]).transpose(0, 1).contiguous()
+            ]).cuda().transpose(0, 1).contiguous()
 
 
             self.similar_body_vector = torch.LongTensor([
                 [self.test_set.questions[y][1] for y in x]
                 for x in batch['similar']
-            ]).transpose(0, 1).contiguous()
+            ]).cuda().transpose(0, 1).contiguous()
 
             self.question_vector = (self.question_title_vector, self.question_body_vector)
 
@@ -333,12 +333,12 @@ class AndroidTestFramework:
             full_similarities = self.cos_similarity(
                 question_embedding.unsqueeze(1).expand_as(full_embedding),
                 full_embedding
-            ).data.numpy()
+            ).data.cpu().numpy()
 
             similar_similarities = self.cos_similarity(
                 question_embedding.unsqueeze(1).expand_as(similar_embedding),
                 similar_embedding
-            ).data.numpy()
+            ).data.cpu().numpy()
 
 
             for i in range(len(full_similarities)):

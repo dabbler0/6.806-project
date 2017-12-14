@@ -58,8 +58,8 @@ def train(embedder,
     tester = AndroidTestFramework((dev_pos_txt, dev_neg_txt), android_questions, title_length, body_length, test_batch_size)
     master = CosineSimilarityMaster(full_embedder, title_length, body_length, margin)
 
-    # if cuda:
-    #     master = master.cuda()
+    if cuda:
+        master = master.cuda()
     optimizer = optim.Adam([param for param in master.parameters() if param.requires_grad], lr = lr)
 
     # Get total number of parameters
@@ -109,12 +109,12 @@ def train(embedder,
         master.train()
 
         for i, batch in enumerate(tqdm(train_loader)):
-            # if cuda:
-            #     batchify = lambda v: Variable(torch.stack(v).cuda())
-            # else:
-            batchify = lambda v: Variable(torch.stack(v))
+            if cuda:
+                batchify = lambda v: Variable(torch.stack(v).cuda())
+            else:
+                batchify = lambda v: Variable(torch.stack(v))
 
-            _, random_indices = torch.rand(100).sort()
+            _, random_indices = torch.rand(100).cuda().sort()
 
             indices = random_indices[:negative_samples]
 
@@ -158,19 +158,19 @@ def train(embedder,
 
         print('Epoch %d: train hinge loss %f, test MAP %0.1f' % (epoch, final_loss / loss_denominator, int(AUC_metric* 1000) / 10.0))
 
-
+unified = CNN()
 train(
-    embedder = CNN(), #False),
-    save_dir='models/cnn',
+    embedder = unified,
+    save_dir='models/cnn-android',
     batch_size = 100,
-    test_batch_size = 100,
+    test_batch_size = 20,
     lr = 1e-4,
 
     title_length = 40,
     negative_samples = 20,
     alpha = 0,
 
-    body_embedder = CNN(),
+    body_embedder = unified,
     body_length = 100,
     merge_strategy = 'mean',
     output_embedding_size = 400,

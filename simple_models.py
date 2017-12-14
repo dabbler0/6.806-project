@@ -8,23 +8,12 @@ import math
 
 from data import word_embedding_size
 
-class AverageEmbedding(nn.Module):
-    def __init__(self):
-        super(AverageEmbedding, self).__init__()
-
-        # Simple model with no parameters that simply
-        # takes average word embedding
-        self.linear = nn.Linear(word_embedding_size, 300)
-
-    def forward(self, batch):
-        return F.relu(self.linear(batch.mean(1)))
-
 class CNN(nn.Module):
-    def __init__(self, hidden_size = 667, dropout = 0.3):
+    def __init__(self, hidden_size = 667, dropout = 0.3, input_size = 202):
         super(CNN, self).__init__()
         self.hidden_size = hidden_size
         self.dropout = nn.Dropout(dropout)
-        self.conv = nn.Conv1d(202, self.hidden_size, kernel_size=3, padding=1)
+        self.conv = nn.Conv1d(input_size, self.hidden_size, kernel_size=3, padding=1)
 
     def forward(self, x):
         x = x.transpose(1, 2)
@@ -50,7 +39,7 @@ class LSTMAverage(nn.Module):
 
     def __init__(self,
                 dropout = 0.3,
-                input_size = word_embedding_size,
+                input_size = 202,
                 hidden_size = 240,
                 bidirectional = True):
         super(LSTMAverage, self).__init__()
@@ -117,7 +106,7 @@ class LSTMAverage(nn.Module):
 class GRUAverage(nn.Module):
     def __init__(self,
                 dropout = 0.3,
-                input_size = word_embedding_size,
+                input_size = 202,
                 hidden_size = 180,
                 bidirectional = True):
         super(GRUAverage, self).__init__()

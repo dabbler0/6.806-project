@@ -8,29 +8,42 @@ word_embedding_size = 202
 Vocabulary and tokenizers
 '''
 class Vocabulary:
-    def __init__(self, fname):
+    def __init__(self, fname, prune_corpora):
         # Token 0 is the padding token.
         # Token 1 is the unknown token.
         self.vocabulary = ['__EOS__', '__UNK__']
         self.word_to_idx = {'__EOS__': 0, '__UNK__': 1}
         self.embedding = []
 
+        # Record which words appear in the corpora so that
+        # we can only include words that actually appear
+        prune_candidates = set()
+        for corpus_fname in prune_corpora:
+            with open(corpus_fname) as corpus:
+                for line in corpus:
+                    qid, title, body = line.split('\t')
+                    words = title.split(' ') + body.split(' ')
+                    prune_candidates.update(words)
+
         with open(fname) as vocab_file:
             for line in tqdm(vocab_file, desc='load vocab'):
                 word = line[:line.index(' ')]
-                vector = [float(x) for x in line[line.index(' '):].split(' ')[1:-1]]
 
-                # Add padding and UNK tokens
-                if len(self.embedding) == 0:
-                    self.embedding.append([0] * (len(vector) + 2))
-                    self.embedding.append([0] * (len(vector)) + [1, 1])
+                # Only include words that appear in one of the corpora (if any exist)
+                if word in prune_candidates or len(prune_corpora) == 0:
+                    vector = [float(x) for x in line[line.index(' '):].split(' ')[1:-1]]
 
-                # This is not a padding vector or UNK
-                vector += [1, 0]
+                    # Add padding and UNK tokens
+                    if len(self.embedding) == 0:
+                        self.embedding.append([0] * (len(vector) + 2))
+                        self.embedding.append([0] * (len(vector)) + [1, 1])
 
-                self.word_to_idx[word] = len(self.vocabulary)
-                self.vocabulary.append(word)
-                self.embedding.append(vector)
+                    # This is not a padding vector or UNK
+                    vector += [1, 0]
+
+                    self.word_to_idx[word] = len(self.vocabulary)
+                    self.vocabulary.append(word)
+                    self.embedding.append(vector)
 
         self.embedding = torch.Tensor(self.embedding)
 

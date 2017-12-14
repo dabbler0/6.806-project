@@ -37,7 +37,7 @@ def train(embedder,
             train_set = 'askubuntu/train_random.txt',
             dev_set = 'askubuntu/dev.txt'):
 
-    vocabulary = Vocabulary(vectors)
+    vocabulary = Vocabulary(vectors, [questions_filename])
     questions = QuestionBase(questions_filename, vocabulary, title_length, body_length)
 
     train_loader = DataLoader(
@@ -160,17 +160,19 @@ def train(embedder,
 
 
 #cnn_model = CNN()
-gru_model = GRUAverage(hidden_size = 190, bidirectional = True)
+gru_model = GRUAverage(hidden_size = 190, bidirectional = True, input_size = 302)
 
 train(
     gru_model,
-    'models/gru-unified-190-mean-batch50',
+    'models/gru-unified-glove',
     batch_size = 50,
     lr = 1e-4,
 
     title_length = 40,
     negative_samples = 20,
     alpha = 0,
+
+    vectors = 'glove/glove.840B.300d.txt',
 
     body_embedder = gru_model,
     body_length = 100,

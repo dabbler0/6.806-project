@@ -351,7 +351,7 @@ class AndroidTestFramework:
                 )
                 self.AUC.add(comb_similarities, comb_target)
 
-        return self.AUC.value()
+        return self.AUC.value(.05)
 
 
 

@@ -13,11 +13,12 @@ class CNN(nn.Module):
         super(CNN, self).__init__()
         self.hidden_size = hidden_size
         self.dropout = nn.Dropout(dropout)
+        self.pad_index = input_size - 2
         self.conv = nn.Conv1d(input_size, self.hidden_size, kernel_size=3, padding=1)
 
     def forward(self, x):
         x = x.transpose(1, 2)
-        padding_mask = x[:, 200, :]
+        padding_mask = x[:, self.pad_index, :]
         x = self.conv(x)
         x = F.relu(x)
         x = self.dropout(x)
@@ -55,6 +56,7 @@ class LSTMAverage(nn.Module):
         self.dropout = dropout
         self.hidden_size = hidden_size
         self.bidirectional = bidirectional
+        self.pad_index = input_size - 2
 
     def signature(self):
         return {
@@ -65,7 +67,7 @@ class LSTMAverage(nn.Module):
         }
 
     def forward(self, batch):
-        padding_mask = batch[:, :, 200]
+        padding_mask = batch[:, :, self.pad_index]
 
         lengths = padding_mask.sum(1).long()
 
@@ -122,6 +124,7 @@ class GRUAverage(nn.Module):
         self.dropout = dropout
         self.hidden_size = hidden_size
         self.bidirectional = bidirectional
+        self.pad_index = input_size - 2
 
     def output_size(self):
         return self.hidden_size * (2 if self.bidirectional else 1)
@@ -135,7 +138,7 @@ class GRUAverage(nn.Module):
         }
 
     def forward(self, batch):
-        padding_mask = batch[:, :, 200]
+        padding_mask = batch[:, :, self.pad_index]
 
         lengths = padding_mask.sum(1).long()
 
@@ -222,7 +225,7 @@ class AttentionIsAllYouNeed(nn.Module):
         # We will perform a self-attention embedding.
         # We want to compute (head) keys, values and queries for each word.
 
-        padding_mask = batch[:, :, 200]
+        padding_mask = batch[:, :, self.pad_index]
 
         key_size, value_size, heads = self.key_size, self.value_size, self.heads
 

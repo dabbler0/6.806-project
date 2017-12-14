@@ -31,7 +31,7 @@ class Vocabulary:
 
                 # Only include words that appear in one of the corpora (if any exist)
                 if word in prune_candidates or len(prune_corpora) == 0:
-                    vector = [float(x) for x in line[line.index(' '):].split(' ')[1:-1]]
+                    vector = [float(x) for x in line[line.index(' '):].split(' ')[1:] if len(x) > 0]
 
                     # Add padding and UNK tokens
                     if len(self.embedding) == 0:

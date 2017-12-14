@@ -10,6 +10,7 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader
 import torch.optim as optim
 from torch.autograd import Variable
+import itertools
 
 import os
 import json
@@ -38,7 +39,6 @@ def train(embedder,
 
     vocabulary = Vocabulary(vectors)
     questions = QuestionBase(questions_filename, vocabulary, title_length, body_length)
-
 
     train_loader = DataLoader(
         TrainSet(train_set, questions),
@@ -159,21 +159,22 @@ def train(embedder,
         print('Epoch %d: train hinge loss %f, test MRR %0.1f' % (epoch, final_loss / loss_denominator, int(test_error * 1000) / 10.0))
 
 
-cnn_model = CNN()
+#cnn_model = CNN()
+gru_model = GRUAverage(hidden_size = 190, bidirectional = True)
 
 train(
-    cnn_model,
-    'models/cnn-unified-mean',
-    batch_size = 200,
+    gru_model,
+    'models/gru-unified-190-mean-batch50',
+    batch_size = 50,
     lr = 1e-4,
 
     title_length = 40,
     negative_samples = 20,
     alpha = 0,
 
-    body_embedder = cnn_model,
+    body_embedder = gru_model,
     body_length = 100,
-    merge_strategy = 'concatenate',
+    merge_strategy = 'mean',
 
     epochs = 50,
     margin = 0.2

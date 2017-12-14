@@ -13,12 +13,17 @@ class Vocabulary:
         # Token 1 is the unknown token.
         self.vocabulary = ['__EOS__', '__UNK__']
         self.word_to_idx = {'__EOS__': 0, '__UNK__': 1}
-        self.embedding = [[0] * 202, [0] * 200 + [1, 1]]
+        self.embedding = []
 
         with open(fname) as vocab_file:
             for line in tqdm(vocab_file, desc='load vocab'):
                 word = line[:line.index(' ')]
                 vector = [float(x) for x in line[line.index(' '):].split(' ')[1:-1]]
+
+                # Add padding and UNK tokens
+                if len(self.embedding) == 0:
+                    self.embedding.append([0] * (len(vector) + 2))
+                    self.embedding.append([0] * (len(vector)) + [1, 1])
 
                 # This is not a padding vector or UNK
                 vector += [1, 0]

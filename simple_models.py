@@ -119,7 +119,47 @@ class GRUDecoder(nn.Module):
         self.output = nn.Linear(hidden_size, output_size)
 
     def forward(self, encodings, targets):
-        # Targets here should be a list of indices
+        # Pack the targets
+        mask = targets.gt(0)
+        lengths = mask.sum(1)
+
+        _, indices = torch.sort(lengths, descending = True)
+        targets = targets[indices]
+
+        # Targets here should be a list of indices.
+        # Right-shift the targets by one
+        shifted_targets = torch.cat(
+            [
+                torch.zeros((target.size()[0], 1)).long(),
+                targets
+            ],
+            dim = 1
+        )[:, :-1]
+
+        packed_sequence = rnn.pack_padded_sequence(
+            shifted_targets,
+            lengths.data.cpu().numpy().tolist(),
+            batch_first = True
+        )
+
+        # Feed packed sequence and encodings
+        output, hn = self.gru(packed_sequence, encodings.unsqueeze(0))
+
+        output = rnn.pad_packed_sequence(output)
+
+        # Apply output. This has (batch_size) x (seq_length) x (vocab_size)
+        predictions = F.log_softmax(self.output(output))
+
+        # Select wanted indices
+        losses = torch.gather(predictions, 2, targets.unsqueeze(2))
+
+        # Mask
+        masked_losses = losses * mask
+
+        # Mean over each sentence and then over cases
+        case_loss = masked_losses.sum(1) / lengths
+
+        return case_loss.mean()
 
 class GRUFoldedAverage(nn.Module):
     def __init__(self,

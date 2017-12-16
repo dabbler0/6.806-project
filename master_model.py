@@ -14,6 +14,20 @@ import numpy as np
 # Regularization parameter for how much we want to penalize everything converging
 alpha = 0.1
 
+class BodyOnlyEmbedder(nn.Module):
+    def __init__(self, vocabulary, body_embedding):
+        self.word_embedding = nn.Embedding(vocabulary.embedding.size()[0], vocabulary.embedding.size()[1])
+        self.word_embedding.weight.data = vocabulary.embedding
+        self.word_embedding.weight.requires_grad = False
+
+        self.body_embedding = body_embdding
+
+        self.batch_norm = nn.BatchNorm1d(output_embedding_size)
+
+    def forward(self, pair):
+        title, body = pair
+        return self.batch_norm(self.body_embedding(self.word_embedding(pair)))
+
 class FullEmbedder(nn.Module):
     def __init__(self, vocabulary, title_embedding, body_embedding, merge_strategy = 'mean', output_embedding_size = 0):
         super(FullEmbedder, self).__init__()
@@ -21,7 +35,7 @@ class FullEmbedder(nn.Module):
         # Word embedding
         self.word_embedding = nn.Embedding(vocabulary.embedding.size()[0], vocabulary.embedding.size()[1])
         self.word_embedding.weight.data = vocabulary.embedding
-        #self.word_embedding.weight.requires_grad = False
+        self.word_embedding.weight.requires_grad = False
 
         # Sentence embedding module
         self.title_embedding = title_embedding

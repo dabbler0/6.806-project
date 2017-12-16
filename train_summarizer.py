@@ -99,7 +99,7 @@ def train(encoder, decoder,
         for i, batch in range(100):
             optimizer.zero_grad()
 
-            titles, bodies = questions.get_random_batch(100)
+            titles, bodies = questions.get_random_batch(batch_size)
 
             loss = decoder(encoder(bodies), titles)
 

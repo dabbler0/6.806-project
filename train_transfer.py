@@ -165,7 +165,8 @@ def train(embedder,
             discrim_loss += discrim_error.data[0]
 
             # Subtract the discimrinator error to the label error
-            loss -= alpha * discrim_error
+            l = (2 / (1 + math.e ** (-2 * float(epoch) / epochs)) - 1)
+            loss -= l * discrim_error
             loss_denominator += 1
 
             loss.backward()
@@ -194,7 +195,7 @@ def train(embedder,
 unified = GRUAverage(input_size = 302, hidden_size = 190)
 train(
     embedder = unified,
-    save_dir = 'models/gru-domain-adaptation-highest-alpha',
+    save_dir = 'models/gru-domain-adaptation-slow-moving-alpha',
     batch_size = 100,
     test_batch_size = 10,
     lr = 3e-4,

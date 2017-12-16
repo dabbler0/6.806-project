@@ -1,0 +1,138 @@
+import torch
+torch.manual_seed(0)
+
+from master_model import *
+from data import *
+from simple_models import *
+
+from tqdm import tqdm
+
+from torch.utils.data import DataLoader
+import torch.optim as optim
+from torch.autograd import Variable
+
+import os
+import json
+
+version = 'third_versioned; batchnorm'
+
+# Hyperparameters
+def train(encoder, decoder,
+            save_dir,
+            title_length = 40,
+            body_length = 100,
+            batch_size = 100,
+            test_batch_size = 100,
+            epochs = 50,
+            lr = 1e-4,
+            cuda = True,
+            alpha = 1e-4,
+            vectors = 'askubuntu/vector/vectors_pruned.200.txt',
+            questions_filename = 'android/corpus.tsv',
+            dev_pos_txt = 'android/dev.pos.txt',
+            dev_neg_txt = 'android/dev.neg.txt'):
+
+    vocabulary = Vocabulary(vectors, [questions_filename])
+    questions = QuestionBase(questions_filename, vocabulary, title_length, body_length)
+
+    encoder = GRUFoldedAverage(input_size = 302, hidden_size = 190)
+    decoder = GRUDecoderLoss(hidden_size = 190, output_size = len(vocabulary.vocabulary))
+
+    full_embedder = BodyOnlyEmbedder(encoder)
+
+    tester = AndroidTestFramework((dev_pos_txt, dev_neg_txt), android_questions, title_length, body_length, test_batch_size, num_examples = 100)
+
+    if cuda:
+        full_embedder = full_embedder.cuda()
+        decoder = decoder.cuda()
+
+    optimizer = optim.Adam(
+        [param for param in full_embedder.parameters() if param.requires_grad] +
+        [param for param in decoder.parameters() if param.requires_grad],
+        lr = lr
+    )
+
+    # Get total number of parameters
+    product = lambda x: x[0] * product(x[1:]) if len(x) > 1 else x[0]
+    number_of_parameters = sum(product(param.size()) for param in master.parameters() if param.requires_grad)
+
+    if number_of_parameters > 450000:
+        print('WARNING: model with %d parameters is larger than the assignment permits.' % (number_of_parameters,))
+
+    if os.path.exists(save_dir):
+        print('WARNING: saving to a directory that already has a model.')
+    else:
+        os.makedirs(save_dir)
+    best_filename = os.path.join(save_dir, 'best.pkl')
+
+    signature_filename = os.path.join(save_dir, 'signature.json')
+
+    with open(signature_filename, 'w') as signature_file:
+        json.dump({
+            'title_length': title_length,
+            'body_length': body_length,
+            'total_params': number_of_parameters,
+            'batch_size': batch_size,
+            'margin': margin,
+            'epochs': epochs,
+            'lr': lr,
+            'cuda': cuda,
+            'output_embedding_size': output_embedding_size,
+            'encoder': encoder.signature(),
+            'decoder': decoder.signature(),
+            'vectors': vectors,
+            'questions': ubuntu_questions_filename,
+            'dev_set': dev_pos_txt,
+            'version': version
+        }, signature_file)
+
+    best_loss = 0
+
+    for epoch in range(epochs):
+        final_loss = 0.0
+        loss_denominator = 0.0
+
+        full_embedder.train()
+        decoder.train()
+
+        # Some arbitrary batch sizes
+        for i, batch in range(100):
+            optimizer.zero_grad()
+
+            titles, bodies = questions.get_random_batch(100)
+
+            loss = decoder(encoder(bodies), titles)
+
+            optimizer.step()
+
+        full_embedder.eval()
+
+        # Run test
+        AUC_metric = tester.metrics(full_embedder)
+        print('Epoch %d: AUC score = %f' % (epoch, AUC_metric))
+
+        save_filename = os.path.join(save_dir, 'epoch%d-loss%f.pkl' % (epoch, AUC_metric))
+        fig_filename = os.path.join(save_dir, 'epoch%d-loss%f-vectors.png' % (epoch, AUC_metric))
+
+        tester.visualize_embeddings(full_embedder, fig_filename)
+
+        torch.save(full_embedder, save_filename)
+        if AUC_metric > best_loss:
+            torch.save(full_embedder, best_filename)
+
+        print('Epoch %d: train hinge loss %f, test MAP %0.1f' % (epoch, final_loss / loss_denominator, int(AUC_metric* 1000) / 10.0))
+
+train(
+    save_dir = 'models/gru-direct-transfer',
+    batch_size = 100,
+    test_batch_size = 10,
+    lr = 1e-4,
+
+    title_length = 40,
+
+    body_embedder = unified,
+    body_length = 100,
+    vectors = 'glove/glove.840B.300d.txt',
+
+    epochs = 50
+)

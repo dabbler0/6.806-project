@@ -10,6 +10,7 @@ from tqdm import tqdm
 from torch.utils.data import DataLoader
 import torch.optim as optim
 from torch.autograd import Variable
+import itertools
 
 import os
 import json
@@ -36,7 +37,7 @@ def train(embedder,
             train_set = 'askubuntu/train_random.txt',
             dev_set = 'askubuntu/dev.txt'):
 
-    vocabulary = Vocabulary(vectors)
+    vocabulary = Vocabulary(vectors, [questions_filename])
     questions = QuestionBase(questions_filename, vocabulary, title_length, body_length)
 
     train_loader = DataLoader(
@@ -51,10 +52,11 @@ def train(embedder,
     tester = TestFramework(dev_set, questions, title_length, body_length)
     master = CosineSimilarityMaster(full_embedder, title_length, body_length, margin)
 
-    # if cuda:
-    #     master = master.cuda()
-
+    if cuda:
+        master = master.cuda()
     optimizer = optim.Adam([param for param in master.parameters() if param.requires_grad], lr = lr)
+
+    print([param.size() for param in master.parameters() if param.requires_grad])
 
     # Get total number of parameters
     product = lambda x: x[0] * product(x[1:]) if len(x) > 1 else x[0]
@@ -103,14 +105,17 @@ def train(embedder,
         master.train()
 
         for i, batch in enumerate(tqdm(train_loader)):
-            # if cuda:
-            #     batchify = lambda v: Variable(torch.stack(v).cuda())
-            # else:
-            batchify = lambda v: Variable(torch.stack(v))
+            if cuda:
+                batchify = lambda v: Variable(torch.stack(v).cuda())
+            else:
+                batchify = lambda v: Variable(torch.stack(v))
 
             _, random_indices = torch.rand(100).sort()
 
             indices = random_indices[:negative_samples]
+
+            if cuda:
+                indices = indices.cuda()
 
             # The batch will be an array of SimilarityEntry objects.
             # We need to merge these into appropriate LongTensor vectors.
@@ -138,34 +143,41 @@ def train(embedder,
 
         # Run test
         mean_average_precision, mean_reciprocal_rank, precision_at_n = tester.metrics(full_embedder)
+
+        test_error = mean_reciprocal_rank
+
         print('Epoch %d: train hinge loss = %f, test MAP = %f, test MRR = %f \n, precision@1 = %f, precision@5 = %f' % (epoch, final_loss / loss_denominator, mean_average_precision, mean_reciprocal_rank, precision_at_n[0], precision_at_n[4]))
 
-
-        save_filename = os.path.join(save_dir, 'epoch%d-loss%f.pkl' % (epoch, mean_average_precision))
-        fig_filename = os.path.join(save_dir, 'epoch%d-loss%f-vectors.png' % (epoch, mean_average_precision))
+        save_filename = os.path.join(save_dir, 'epoch%d-loss%f-map%f.pkl' % (epoch, test_error, mean_average_precision))
+        fig_filename = os.path.join(save_dir, 'epoch%d-loss%f-vectors.png' % (epoch, test_error))
 
         tester.visualize_embeddings(full_embedder, fig_filename)
 
-        torch.save(embedder, save_filename)
-        if mean_average_precision > best_loss:
-            torch.save(embedder, best_filename)
+        torch.save(full_embedder, save_filename)
+        if test_error > best_loss:
+            torch.save(full_embedder, best_filename)
 
-        print('Epoch %d: train hinge loss %f, test MAP %0.1f' % (epoch, final_loss / loss_denominator, int(mean_average_precision * 1000) / 10.0))
+        print('Epoch %d: train hinge loss %f, test MRR %0.1f' % (epoch, final_loss / loss_denominator, int(test_error * 1000) / 10.0))
+
+
+#cnn_model = CNN()
+gru_model = GRUAverage(hidden_size = 190, bidirectional = True, input_size = 302)
 
 train(
-    CNN(), #False),
-    'models/cnn',
-    batch_size = 20,
+    gru_model,
+    'models/gru-unified-glove',
+    batch_size = 50,
     lr = 1e-4,
 
     title_length = 40,
     negative_samples = 20,
     alpha = 0,
 
-    body_embedder = CNN(),
+    vectors = 'glove/glove.840B.300d.txt',
+
+    body_embedder = gru_model,
     body_length = 100,
     merge_strategy = 'mean',
-    output_embedding_size = 400,
 
     epochs = 1,
     margin = 0.2

@@ -2,35 +2,26 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.utils.rnn as rnn
+from torch.autograd import Variable
 
 import math
 
 from data import word_embedding_size
 
-class AverageEmbedding(nn.Module):
-    def __init__(self):
-        super(AverageEmbedding, self).__init__()
-
-        # Simple model with no parameters that simply
-        # takes average word embedding
-        self.linear = nn.Linear(word_embedding_size, 300)
-
-    def forward(self, batch):
-        return F.relu(self.linear(batch.mean(1)))
-
 class CNN(nn.Module):
-    def __init__(self, hidden_size = 667):
+    def __init__(self, hidden_size = 667, dropout = 0.3, input_size = 202):
         super(CNN, self).__init__()
-        self.tan = nn.Tanh()
         self.hidden_size = hidden_size
-        self.conv = nn.Conv1d(202, self.hidden_size, kernel_size=3, padding=1)
-        # self.pooling = nn.AvgPool1d(667)
+        self.dropout = nn.Dropout(dropout)
+        self.pad_index = input_size - 2
+        self.conv = nn.Conv1d(input_size, self.hidden_size, kernel_size=3, padding=1)
 
     def forward(self, x):
         x = x.transpose(1, 2)
-        padding_mask = x[:, 200, :]
+        padding_mask = x[:, self.pad_index, :]
         x = self.conv(x)
-        x = self.tan(x)
+        x = F.relu(x)
+        x = self.dropout(x)
         x = (padding_mask.unsqueeze(2)*x.transpose(1, 2)).sum(1)/padding_mask.sum(1).unsqueeze(1)
         return x
 
@@ -49,7 +40,7 @@ class LSTMAverage(nn.Module):
 
     def __init__(self,
                 dropout = 0.3,
-                input_size = word_embedding_size,
+                input_size = 202,
                 hidden_size = 240,
                 bidirectional = True):
         super(LSTMAverage, self).__init__()
@@ -65,6 +56,7 @@ class LSTMAverage(nn.Module):
         self.dropout = dropout
         self.hidden_size = hidden_size
         self.bidirectional = bidirectional
+        self.pad_index = input_size - 2
 
     def signature(self):
         return {
@@ -75,7 +67,7 @@ class LSTMAverage(nn.Module):
         }
 
     def forward(self, batch):
-        padding_mask = batch[:, :, 200]
+        padding_mask = batch[:, :, self.pad_index]
 
         lengths = padding_mask.sum(1).long()
 
@@ -114,12 +106,9 @@ class LSTMAverage(nn.Module):
         return output
 
 class GRUAverage(nn.Module):
-    def output_size(self):
-        return self.hidden_size * (2 if self.bidirectional else 1)
-
     def __init__(self,
                 dropout = 0.3,
-                input_size = word_embedding_size,
+                input_size = 202,
                 hidden_size = 180,
                 bidirectional = True):
         super(GRUAverage, self).__init__()
@@ -135,6 +124,10 @@ class GRUAverage(nn.Module):
         self.dropout = dropout
         self.hidden_size = hidden_size
         self.bidirectional = bidirectional
+        self.pad_index = input_size - 2
+
+    def output_size(self):
+        return self.hidden_size * (2 if self.bidirectional else 1)
 
     def signature(self):
         return {
@@ -145,7 +138,7 @@ class GRUAverage(nn.Module):
         }
 
     def forward(self, batch):
-        padding_mask = batch[:, :, 200]
+        padding_mask = batch[:, :, self.pad_index]
 
         lengths = padding_mask.sum(1).long()
 
@@ -184,16 +177,18 @@ class GRUAverage(nn.Module):
         return output
 
 class AttentionIsAllYouNeed(nn.Module):
-    def __init__(self, heads, output_size = 200, key_size = 64, value_size = 64):
+    def __init__(self, heads = 3, out_embedding_size = 200,
+                key_size = 64, value_size = 64, dropout_value = 0.3):
+        super(AttentionIsAllYouNeed, self).__init__()
         self.heads = heads
-        self.output_size = output_size
+        self.out_embedding_size = out_embedding_size
         self.key_size = key_size
         self.value_size = value_size
 
         # The initial transform, which generates
         # all the queries, keys, and values.
         self.initial_transform = nn.Linear(
-            202,
+            202 + 20, # TODO make size of position encoding parameterizable
             self.heads * (2 * key_size + value_size)
         )
 
@@ -201,22 +196,28 @@ class AttentionIsAllYouNeed(nn.Module):
         # attention heads and produces the output encoding
         self.merge_transform = nn.Linear(
             self.heads * value_size,
-            self.output_size
+            self.out_embedding_size
         )
 
-        self.frequency_matrix = torch.pow(1e-4, torch.arange(1, 11) / 10).view(1, -1)
+        self.dropout_value = dropout_value
+        self.dropout = nn.Dropout(self.dropout_value)
+
+        self.frequency_matrix = Variable(torch.pow(
+            1e-4, torch.arange(1, 11).cuda() / 10).view(1, -1),
+            requires_grad = False)
 
     def output_size(self):
-        return self.output_size
+        return self.out_embedding_size
 
     def signature(self):
         return {
             'type': 'AttenionIsAllYouNeed',
-            'output_size': self.output_size,
+            'out_embedding_size': self.out_embedding_size,
             'heads': self.heads,
             'positional_encodings': 10,
             'key_size': self.key_size,
-            'value_size': self.value_size
+            'value_size': self.value_size,
+            'dropout_value': self.dropout_value
         }
 
     def forward(self, batch):
@@ -224,7 +225,7 @@ class AttentionIsAllYouNeed(nn.Module):
         # We will perform a self-attention embedding.
         # We want to compute (head) keys, values and queries for each word.
 
-        padding_mask = batch[:, :, 200]
+        padding_mask = batch[:, :, self.pad_index]
 
         key_size, value_size, heads = self.key_size, self.value_size, self.heads
 
@@ -232,24 +233,26 @@ class AttentionIsAllYouNeed(nn.Module):
         pos_size = self.frequency_matrix.size()[1]
 
         # Positional encoding
-        positions = torch.arange(0, seq_length).view(
-            1, seq_length, 1)
+        positions = Variable(torch.arange(0, seq_length).cuda().view(
+            seq_length, 1), requires_grad = False)
         position_ratios = torch.torch.mm(positions, self.frequency_matrix)
-        sin_encoding = torch.sin(position_ratios).expand(batch_size, seq_length, pos_size)
-        cos_encoding = torch.cos(position_ratios).expand(batch_size, seq_length, pos_size)
-        batch = torch.cat([batch, sin_encoding, cos_encoding], dim = 3)
+        sin_encoding = torch.sin(position_ratios
+            ).unsqueeze(0).expand(batch_size, seq_length, pos_size)
+        cos_encoding = torch.cos(position_ratios
+            ).unsqueeze(0).expand(batch_size, seq_length, pos_size)
+        batch = torch.cat([batch, sin_encoding, cos_encoding], dim = 2)
 
         # Update embedding size to match embedding with positional encoding
         embedding_size += pos_size * 2
 
         # Get queries, keys, values
-        all_info = self.initial_transform(
-            batch.view(-1, embedding_size)).view(batch_size, seq_length, -1)
+        all_info = F.relu(self.initial_transform(
+            batch.view(-1, embedding_size)).view(batch_size, seq_length, -1))
 
         # Each of these should be (batch_size) x (seq_length) x (heads) x (dim)
-        queries = all_info[:, :, :(self.heads * key_size)]
-        keys = all_info[:, :, (self.heads * key_size):(self.heads * key_size) * 2]
-        values = all_info[:, :, -(self.heads * value_size):]
+        queries = all_info[:, :, :(self.heads * key_size)].contiguous()
+        keys = all_info[:, :, (self.heads * key_size):(self.heads * key_size) * 2].contiguous()
+        values = all_info[:, :, -(self.heads * value_size):].contiguous()
 
         queries = queries.view(batch_size, seq_length, heads, key_size)
         keys = queries.view(batch_size, seq_length, heads, key_size)
@@ -258,25 +261,30 @@ class AttentionIsAllYouNeed(nn.Module):
         # Batched matrix multiplication to get query-key similarity.
         # We need to transpose queries and keys to put heads first,
         # so that we can batch them properly.
-        queries = queries.transpose(1, 2).copy()
-        keys = queries.transpose(1, 2).copy()
-        values = queries.transpose(1, 2).copy()
+        queries = queries.transpose(1, 2)
+        keys_transpose = queries.transpose(1, 2).transpose(2, 3)
+        values_transpose = queries.transpose(1, 2)
+
+        queries = self.dropout(queries)
+        keys = self.dropout(keys)
+        values = self.dropout(values)
 
         # Get attentions
         attentions = torch.bmm(
             queries.view(-1, seq_length, key_size),
-            keys.view(-1, seq_length, key_size)
+            keys.view(-1, key_size, seq_length)
         ).view(batch_size, heads, seq_length, seq_length)
 
         # "Scaled dot-product attention"
         attentions /= math.sqrt(key_size)
 
         # Softmax over the last dimension
-        attentions = F.softmax(attentions, dim = 3)
+        attentions = F.softmax(
+            attentions.view(-1, seq_length)).view(batch_size, heads, seq_length, seq_length)
 
         # Mask out padding vectors
-        attentions *= padding_mask.unsqueeze(1).unsqueeze(1).expand_as(attentions)
-        attentions /= attentions.sum(dim = 3).unsqueeze(3).expand_as(attentions)
+        attentions = attentions * padding_mask.unsqueeze(1).unsqueeze(1).expand_as(attentions)
+        attentions = attentions / attentions.sum(dim = 3).unsqueeze(3).expand_as(attentions)
 
         # Apply attention to values
         # This should produce a matrix of size (batch_size) x (heads) x (seq_len) x (value_dim)
@@ -286,7 +294,7 @@ class AttentionIsAllYouNeed(nn.Module):
         ).view(batch_size, heads, seq_length, value_size)
 
         # Re-concatenate all of the aggregations
-        aggregations = aggregations.transpose(1, 2).copy().view(batch_size, seq_length, -1)
+        aggregations = aggregations.transpose(1, 2).contiguous().view(batch_size, seq_length, -1)
 
         # Merge transform, yielding (batch_size) x (seq_len) x (embedding_size)
         embeddings = self.merge_transform(
@@ -295,5 +303,18 @@ class AttentionIsAllYouNeed(nn.Module):
         # Average embedding
         return (
             (embeddings * padding_mask.unsqueeze(2).expand_as(embeddings)).sum(1) /
-            padding_mask.sum(1).unsqueeze(1).expand(batch_size, self.output_size)
+            padding_mask.sum(1).unsqueeze(1).expand(batch_size, self.out_embedding_size)
+        )
+
+
+class TwoLayerDiscriminator(nn.Module):
+    def __init__(self, input_size = 280, hidden_size = 300):
+        super(TwoLayerDiscriminator, self).__init__()
+
+        self.first_layer = nn.Linear(input_size, hidden_size)
+        self.second_layer = nn.Linear(hidden_size, 2)
+
+    def forward(self, x):
+        return F.softmax(
+            self.second_layer(F.relu(self.first_layer(x)))
         )

@@ -39,6 +39,8 @@ class FullEmbedder(nn.Module):
             output_embedding_size = total_size
         elif self.merge_strategy == 'mean':
             output_embedding_size = title_embedding.output_size()
+        else:
+            raise Exception('Unrecognized merge strategy \'%s\'' % (merge_strategy,))
 
         self.batch_norm = nn.BatchNorm1d(output_embedding_size)
 
@@ -254,8 +256,8 @@ class TestFramework:
         plt.savefig(filename)
 
 class AndroidTestFramework:
-    def __init__(self, test, questions, title_length, body_length, test_batch_size, cuda = True):
-        self.test_set = AndroidTestSet(test, questions)
+    def __init__(self, test, questions, title_length, body_length, test_batch_size, num_examples = None, cuda = True):
+        self.test_set = AndroidTestSet(test, questions, num_examples)
         self.batch_size = test_batch_size
         self.test_loader = DataLoader(
                 AndroidTestSet(test, questions),
@@ -359,3 +361,6 @@ class AndroidTestFramework:
         question_embedding = embedder(self.question_vector)
         plt.matshow(question_embedding.data.cpu().numpy())
         plt.savefig(filename)
+
+    def sample(self, embedder):
+        return embedder(self.question_vector)

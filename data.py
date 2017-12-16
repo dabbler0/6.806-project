@@ -8,24 +8,42 @@ word_embedding_size = 202
 Vocabulary and tokenizers
 '''
 class Vocabulary:
-    def __init__(self, fname):
+    def __init__(self, fname, prune_corpora):
         # Token 0 is the padding token.
         # Token 1 is the unknown token.
         self.vocabulary = ['__EOS__', '__UNK__']
         self.word_to_idx = {'__EOS__': 0, '__UNK__': 1}
-        self.embedding = [[0] * 202, [0] * 200 + [1, 1]]
+        self.embedding = []
+
+        # Record which words appear in the corpora so that
+        # we can only include words that actually appear
+        prune_candidates = set()
+        for corpus_fname in prune_corpora:
+            with open(corpus_fname) as corpus:
+                for line in corpus:
+                    qid, title, body = line.split('\t')
+                    words = [x.lower() for x in title.split(' ') + body.split(' ')]
+                    prune_candidates.update(words)
 
         with open(fname) as vocab_file:
             for line in tqdm(vocab_file, desc='load vocab'):
-                word = line[:line.index(' ')]
-                vector = [float(x) for x in line[line.index(' '):].split(' ')[1:-1]]
+                word = line[:line.index(' ')].lower()
 
-                # This is not a padding vector or UNK
-                vector += [1, 0]
+                # Only include words that appear in one of the corpora (if any exist)
+                if word in prune_candidates or len(prune_corpora) == 0:
+                    vector = [float(x) for x in line[line.index(' '):].split(' ')[1:] if len(x) > 0]
 
-                self.word_to_idx[word] = len(self.vocabulary)
-                self.vocabulary.append(word)
-                self.embedding.append(vector)
+                    # Add padding and UNK tokens
+                    if len(self.embedding) == 0:
+                        self.embedding.append([0] * (len(vector) + 2))
+                        self.embedding.append([0] * (len(vector)) + [1, 1])
+
+                    # This is not a padding vector or UNK
+                    vector += [1, 0]
+
+                    self.word_to_idx[word] = len(self.vocabulary)
+                    self.vocabulary.append(word)
+                    self.embedding.append(vector)
 
         self.embedding = torch.Tensor(self.embedding)
 
@@ -52,10 +70,12 @@ class Question:
 
 class QuestionBase:
     def __init__(self, questions, vocabulary, title_length, body_length):
-        self.questions = {-1: ([0] * title_length, [0] * body_length)}
+        self.questions = {-1: ([1] + [0] * (title_length - 1), [1] + [0] * (body_length - 1))}
         self.vocabulary = vocabulary
         self.title_length = title_length
         self.body_length = body_length
+
+        self.all_qids = []
 
         with open(questions) as question_file:
             for line in tqdm(question_file, desc='load questions'):
@@ -64,19 +84,50 @@ class QuestionBase:
                 qid, title, body = line.split('\t')
                 qid = int(qid)
 
+                self.all_qids.append(qid)
 
                 # Add dimension that flags whether we are in the title or the body
-                title = [vocabulary.to_idx(t) for t in title.split(' ')]
+                title = [vocabulary.to_idx(t.lower()) for t in title.split(' ')]
                 if len(title) <= title_length:
                     title += [0] * (title_length - len(title))
                 title = title[:title_length]
 
-                body = [vocabulary.to_idx(t) for t in body.split(' ')]
+                body = [vocabulary.to_idx(t.lower()) for t in body.split(' ')]
                 if len(body) <= body_length:
                     body += [0] * (body_length - len(body))
                 body = body[:body_length]
 
                 self.questions[qid] = (title, body)
+
+
+        # Make a LongTensor of all possible qids, for random
+        # selection
+        self.all_qids = torch.LongTensor(self.all_qids)
+
+    def get_random_batch(self, batch_size, cuda = True):
+        # Get batch_size random indices into the qids tensor
+        indices = torch.floor(torch.Tensor(batch_size).uniform_() * self.all_qids.size()[0]).long()
+
+        # Get batch_size random qids
+        qids = self.all_qids[indices]
+
+        title_list = []
+        body_list = []
+
+        for qid in qids:
+            title, body = self[qid]
+            title_list.append(title)
+            body_list.append(body)
+
+        # Make into tensors for processing
+        title_tensor = torch.LongTensor(title_list)
+        body_tensor = torch.LongTensor(body_list)
+
+        if cuda:
+            title_tensor = title_tensor.cuda()
+            body_tensor = body_tensor.cuda()
+
+        return title_tensor, body_tensor
 
     def __getitem__(self, item):
         return self.questions[item]
@@ -134,7 +185,7 @@ class TestSet:
 
 
 class AndroidTestSet:
-    def __init__(self, test_set, questions):
+    def __init__(self, test_set, questions, num_examples = None):
         self.questions = questions
         self.entries = []
         self.pos_set, self.neg_set = test_set
@@ -204,6 +255,9 @@ class AndroidTestSet:
         entry = self.entries[added]
         entry['similar'] = prev_similar
         entry['similar_mask'] = previous_length
+
+        if num_examples is not None:
+            self.entries = self.entries[:num_examples]
 
     def __len__(self):
         return len(self.entries)

@@ -22,6 +22,7 @@ def train(embedder,
             title_length = 40,
             body_length = 100,
             batch_size = 100,
+            mixed_size = 50,
             test_batch_size = 100,
             margin = 0.1,
             epochs = 50,
@@ -32,6 +33,7 @@ def train(embedder,
             negative_samples = 20,
             output_embedding_size = 0,
             alpha = 1e-4,
+            discriminator = None,
             vectors = 'askubuntu/vector/vectors_pruned.200.txt',
             android_questions_filename = 'android/corpus.tsv',
             ubuntu_questions_filename = 'askubuntu/text_tokenized.txt',
@@ -60,7 +62,12 @@ def train(embedder,
 
     if cuda:
         master = master.cuda()
+        discimrinator = discriminator.cuda()
+
+    # Two optimizers, one which trains just the disciminator and one
+    # which trains everything else
     optimizer = optim.Adam([param for param in master.parameters() if param.requires_grad], lr = lr)
+    discrim_optimizer = optim.Adam([param for param in discriminator.parameters() if param.requires_grad], lr = -lr)
 
     # Get total number of parameters
     product = lambda x: x[0] * product(x[1:]) if len(x) > 1 else x[0]
@@ -109,6 +116,9 @@ def train(embedder,
         master.train()
 
         for i, batch in enumerate(tqdm(train_loader)):
+            optimizer.zero_grad()
+            discrim_optimizer.zero_grad()
+
             if cuda:
                 batchify = lambda v: Variable(torch.stack(v).cuda())
             else:
@@ -129,20 +139,42 @@ def train(embedder,
 
             # Run forward, backward.
             loss = master(q, similar, random).mean()
-            regularization_factor = alpha * full_embedder.regularizer()
+
+            # Now do the domain adaptation error.
+            # Get some random vectors from each
+            android_random_batch = android_questions.get_random_batch(mixed_size, cuda)
+            ubuntu_random_batch = ubuntu_questions.get_random_batch(mixed_size, cuda)
+            target = Variable(torch.LongTensor([0 for _ in range(mixed_size)] +
+                [1 for _ in range(mixed_size)]))
+
+            if cuda:
+                target = target.cuda()
+
+            # Embed and run through discriminator
+            label_predictions = discriminator(torch.cat(
+                [full_embedder(android_random_batch),
+                full_embedder(ubuntu_random_batch)],
+                dim = 0
+            ))
+
+            # Run the discriminator forward
+            discrim_error = F.nll_loss(label_predictions, target)
+
             final_loss += loss.data[0]
-            loss += regularization_factor
+
+            # Subtract the discimrinator error to the label error
+            loss -= alpha * discrim_error
             loss_denominator += 1
 
             loss.backward()
 
             # Step
             optimizer.step()
-            #mean_average_precision, mean_reciprocal_rank, precision_at_n = tester.metrics(full_embedder)
+            discrim_optimizer.step()
 
         master.eval()
 
-                # Run test
+        # Run test
         AUC_metric = tester.metrics(full_embedder)
         print('Epoch %d: AUC score = %f' % (epoch, AUC_metric))
 
@@ -152,29 +184,31 @@ def train(embedder,
 
         tester.visualize_embeddings(full_embedder, fig_filename)
 
-        torch.save(full_embedder, save_filename)
+        torch.save((discriminator, full_embedder), save_filename)
         if AUC_metric > best_loss:
-            torch.save(full_embedder, best_filename)
+            torch.save((discriminator, full_embedder), best_filename)
 
         print('Epoch %d: train hinge loss %f, test MAP %0.1f' % (epoch, final_loss / loss_denominator, int(AUC_metric* 1000) / 10.0))
 
 unified = GRUAverage(input_size = 302, hidden_size = 190)
 train(
     embedder = unified,
-    save_dir = 'models/gru-direct-transfer',
+    save_dir = 'models/gru-domain-adaptation-low-alpha',
     batch_size = 100,
     test_batch_size = 10,
     lr = 1e-4,
 
     title_length = 40,
     negative_samples = 20,
-    alpha = 0,
+    alpha = 1e-6,
 
     body_embedder = unified,
     body_length = 100,
     merge_strategy = 'mean',
     output_embedding_size = 400,
     vectors = 'glove/glove.840B.300d.txt',
+
+    discriminator = TwoLayerDiscriminator(380, 380),
 
     epochs = 50,
     margin = 0.2

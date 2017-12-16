@@ -34,18 +34,15 @@ class CNN(nn.Module):
             'hidden_size': self.hidden_size
         }
 
-class LSTMAverage(nn.Module):
-    def output_size(self):
-        return self.hidden_size * (2 if self.bidirectional else 1)
-
+class GRUAverage(nn.Module):
     def __init__(self,
                 dropout = 0.3,
                 input_size = 202,
-                hidden_size = 240,
+                hidden_size = 180,
                 bidirectional = True):
-        super(LSTMAverage, self).__init__()
+        super(GRUAverage, self).__init__()
 
-        self.lstm = nn.LSTM(
+        self.gru = nn.LSTM(
             input_size = input_size,
             hidden_size = hidden_size,
             num_layers = 1,
@@ -57,6 +54,9 @@ class LSTMAverage(nn.Module):
         self.hidden_size = hidden_size
         self.bidirectional = bidirectional
         self.pad_index = input_size - 2
+
+    def output_size(self):
+        return self.hidden_size * (2 if self.bidirectional else 1)
 
     def signature(self):
         return {
@@ -84,7 +84,7 @@ class LSTMAverage(nn.Module):
         )
 
         # LSTM
-        packed_output, (h, c) = self.lstm(packed_sequence)
+        packed_output, (c, h) = self.lstm(packed_sequence)
 
         # Unpack
         raw_output, _lengths = rnn.pad_packed_sequence(packed_output, batch_first = True)

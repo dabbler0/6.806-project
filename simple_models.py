@@ -105,6 +105,46 @@ class LSTMAverage(nn.Module):
 
         return output
 
+class GRUDecoder(nn.Module):
+    def __init__(self,
+                    dropout = 0.3,
+                    hidden_size = 180,
+                    output_size = 10000):
+        self.gru = nn.GRU(
+            input_size = output_size,
+            hidden_size = hidden_size,
+            num_layers = 1
+        )
+
+        self.output = nn.Linear(hidden_size, output_size)
+
+    def forward(self, encodings, targets):
+        # Targets here should be a list of indices
+
+class GRUFoldedAverage(nn.Module):
+    def __init__(self,
+                dropout = 0.3,
+                input_size = 202,
+                hidden_size = 180):
+        self.gru_average = GRUAverage(self, dropout, input_size, hidden_size, True)
+        self.hidden_size = hidden_size
+
+    def output_size(self):
+        return self.hidden_size
+
+    def signature(self):
+        return {
+            'type': 'GRUFoldedAverage',
+            'gru': self.gru_average.signature()
+        }
+
+    def forward(self, batch):
+        result = self.gru_average(batch)
+        forward = result[:, :self.hidden_size]
+        backward = result[:, self.hidden_size:]
+
+        return forward + backward
+
 class GRUAverage(nn.Module):
     def __init__(self,
                 dropout = 0.3,

@@ -21,7 +21,7 @@ class FullEmbedder(nn.Module):
         # Word embedding
         self.word_embedding = nn.Embedding(vocabulary.embedding.size()[0], vocabulary.embedding.size()[1])
         self.word_embedding.weight.data = vocabulary.embedding
-        self.word_embedding.weight.requires_grad = False
+        #self.word_embedding.weight.requires_grad = False
 
         # Sentence embedding module
         self.title_embedding = title_embedding

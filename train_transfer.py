@@ -165,7 +165,7 @@ def train(embedder,
             discrim_loss += discrim_error.data[0]
 
             # Subtract the discimrinator error to the label error
-            l = (2 / (1 + math.e ** (-2 * float(epoch) / epochs)) - 1)
+            l = (2 / (1 + math.e ** (-float(epoch) / epochs)) - 1)
             loss -= l * discrim_error
             loss_denominator += 1
 

@@ -159,6 +159,12 @@ class TestFramework:
             self.question_body_vector = self.question_body_vector.cuda()
             self.full_body_vector = self.full_body_vector.cuda()
 
+        self.question_title_vector = Variable(self.question_title_vector)
+        self.full_title_vector = Variable(self.full_title_vector)
+
+        self.question_body_vector = Variable(self.question_body_vector)
+        self.full_body_vector = Variable(self.full_body_vector)
+
         self.question_vector = (self.question_title_vector, self.question_body_vector)
 
 class TestFramework:

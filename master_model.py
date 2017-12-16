@@ -21,6 +21,7 @@ class FullEmbedder(nn.Module):
         # Word embedding
         self.word_embedding = nn.Embedding(vocabulary.embedding.size()[0], vocabulary.embedding.size()[1])
         self.word_embedding.weight.data = vocabulary.embedding
+
         #self.word_embedding.weight.requires_grad = False
 
         # Sentence embedding module
@@ -48,8 +49,8 @@ class FullEmbedder(nn.Module):
         title, body = pair
 
         if self.body_embedding is not None:
-            title_encodings = self.title_embedding(self.word_embedding(title))
-            body_encodings = self.body_embedding(self.word_embedding(body))
+            title_encodings = self.title_embedding(self.word_embedding(title), title.gt(0))
+            body_encodings = self.body_embedding(self.word_embedding(body), body.gt(0))
 
             # Combine title and body encodings
             if self.merge_strategy == 'concatenate':

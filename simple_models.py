@@ -16,9 +16,8 @@ class CNN(nn.Module):
         self.pad_index = input_size - 2
         self.conv = nn.Conv1d(input_size, self.hidden_size, kernel_size=3, padding=1)
 
-    def forward(self, x):
+    def forward(self, x, padding_mask):
         x = x.transpose(1, 2)
-        padding_mask = x[:, self.pad_index, :]
         x = self.conv(x)
         x = F.relu(x)
         x = self.dropout(x)
@@ -34,18 +33,15 @@ class CNN(nn.Module):
             'hidden_size': self.hidden_size
         }
 
-class LSTMAverage(nn.Module):
-    def output_size(self):
-        return self.hidden_size * (2 if self.bidirectional else 1)
-
+class GRUAverage(nn.Module):
     def __init__(self,
                 dropout = 0.3,
                 input_size = 202,
-                hidden_size = 240,
+                hidden_size = 180,
                 bidirectional = True):
-        super(LSTMAverage, self).__init__()
+        super(GRUAverage, self).__init__()
 
-        self.lstm = nn.LSTM(
+        self.gru = nn.LSTM(
             input_size = input_size,
             hidden_size = hidden_size,
             num_layers = 1,
@@ -57,6 +53,9 @@ class LSTMAverage(nn.Module):
         self.hidden_size = hidden_size
         self.bidirectional = bidirectional
         self.pad_index = input_size - 2
+
+    def output_size(self):
+        return self.hidden_size * (2 if self.bidirectional else 1)
 
     def signature(self):
         return {
@@ -84,7 +83,7 @@ class LSTMAverage(nn.Module):
         )
 
         # LSTM
-        packed_output, (h, c) = self.lstm(packed_sequence)
+        packed_output, (c, h) = self.lstm(packed_sequence)
 
         # Unpack
         raw_output, _lengths = rnn.pad_packed_sequence(packed_output, batch_first = True)
@@ -137,9 +136,7 @@ class GRUAverage(nn.Module):
             'bidirectional': self.bidirectional
         }
 
-    def forward(self, batch):
-        padding_mask = batch[:, :, self.pad_index]
-
+    def forward(self, batch, padding_mask):
         lengths = padding_mask.sum(1).long()
 
         lengths, indices = lengths.sort(descending = True)
@@ -220,12 +217,10 @@ class AttentionIsAllYouNeed(nn.Module):
             'dropout_value': self.dropout_value
         }
 
-    def forward(self, batch):
+    def forward(self, batch, padding_mask):
         # batch will be of size (batch_size) x (seq_length) x (embedding_size)
         # We will perform a self-attention embedding.
         # We want to compute (head) keys, values and queries for each word.
-
-        padding_mask = batch[:, :, self.pad_index]
 
         key_size, value_size, heads = self.key_size, self.value_size, self.heads
 

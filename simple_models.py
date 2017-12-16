@@ -19,7 +19,7 @@ class AverageEmbedding(nn.Module):
         return F.relu(self.linear(batch.mean(1)))
 
 class CNN(nn.Module):
-    def __init__(self, hidden_size = 667):
+    def __init__(self, hidden_size = 500):
         super(CNN, self).__init__()
         self.tan = nn.Tanh()
         self.hidden_size = hidden_size

@@ -5,6 +5,7 @@ import numpy as np
 
 from data import *
 from meter import *
+from scipy.sparse import csr_matrix, find
 
 import matplotlib
 matplotlib.use('Agg')
@@ -116,47 +117,6 @@ class CosineSimilarityMaster(nn.Module):
         # which is our intention.
         return F.relu(maximum_random_similarity - similar_similarity)
 
-class TestFramework:
-    def __init__(self, test, questions, title_length, body_length, cuda = True):
-        self.test_set = TestSet(test, questions)
-
-        self.title_length = title_length
-        self.body_length = body_length
-
-        self.cos_similarity = nn.CosineSimilarity(dim=2, eps=1e-6)
-
-        # LongTensor of (cases) x (trunc_length)
-        self.question_title_vector = torch.LongTensor([
-            self.test_set.questions[x['q']][0] for x in self.test_set.entries
-        ])
-        self.question_body_vector = torch.LongTensor([
-            self.test_set.questions[x['q']][1] for x in self.test_set.entries
-        ])
-
-        # LongTensor of (cases) x (num_full) x (trunc_length)
-        self.full_title_vector = torch.LongTensor([
-            [self.test_set.questions[y][0] for y in x['full']]
-            for x in self.test_set.entries
-        ])
-
-        self.full_body_vector = torch.LongTensor([
-            [self.test_set.questions[y][1] for y in x['full']]
-            for x in self.test_set.entries
-        ])
-
-        self.similar_sets = [
-            set(x['full'].index(i) for i in x['similar'] if i in x['full'])
-            for x in self.test_set.entries
-        ]
-
-        # if cuda:
-        #     self.question_title_vector = self.question_title_vector.cuda()
-        #     self.full_title_vector = self.full_title_vector.cuda()
-        #
-        #     self.question_body_vector = self.question_body_vector.cuda()
-        #     self.full_body_vector = self.full_body_vector.cuda()
-
-        self.question_vector = (self.question_title_vector, self.question_body_vector)
 
 class TestFramework:
     def __init__(self, test, questions, title_length, body_length, cuda = True):
@@ -268,6 +228,7 @@ class AndroidTestFramework:
 
         self.cos_similarity = nn.CosineSimilarity(dim=2, eps=1e-6)
         self.AUC = AUCMeter()
+        self.cuda = cuda
 
     def metrics(self, embedder):
         # Get embeddings for all the questions
@@ -277,40 +238,49 @@ class AndroidTestFramework:
 
             self.question_title_vector = torch.LongTensor([
                 self.test_set.questions[x][0] for x in batch['q']
-            ])
+            ]).cuda()
 
             self.question_body_vector = torch.LongTensor([
                 self.test_set.questions[x][1] for x in batch['q']
-            ])
+            ]).cuda()
 
             # LongTensor of (cases) x (num_full) x (trunc_length)
             self.full_title_vector = torch.LongTensor([
                 [self.test_set.questions[y][0] for y in x]
                 for x in batch['full']
-            ]).transpose(0, 1).contiguous()
+            ]).cuda().transpose(0, 1).contiguous()
 
 
             self.full_body_vector = torch.LongTensor([
                 [self.test_set.questions[y][1] for y in x]
                 for x in batch['full']
-            ]).transpose(0, 1).contiguous()
+            ]).cuda().transpose(0, 1).contiguous()
 
             # LongTensor of (cases) x (num_full) x (trunc_length)
             self.similar_title_vector = torch.LongTensor([
                 [self.test_set.questions[y][0] for y in x]
                 for x in batch['similar']
-            ]).transpose(0, 1).contiguous()
+            ]).cuda().transpose(0, 1).contiguous()
 
 
             self.similar_body_vector = torch.LongTensor([
                 [self.test_set.questions[y][1] for y in x]
                 for x in batch['similar']
-            ]).transpose(0, 1).contiguous()
+            ]).cuda().transpose(0, 1).contiguous()
+
+            # if cuda:
+            #     self.question_title_vector = self.question_title_vector.cuda()
+            #     self.full_title_vector = self.full_title_vector.cuda()
+            #     self.similar_title_vector = self.similar_title_vector.cuda()
+            #
+            #     self.question_body_vector = self.question_body_vector.cuda()
+            #     self.full_body_vector = self.full_body_vector.cuda()
+            #     self.smilar_body_vector = self.similar_body_vector.cuda()
 
             self.question_vector = (self.question_title_vector, self.question_body_vector)
 
-            self.similar_mask = torch.IntTensor([int(x) for x in batch['similar_mask']])
-            self.full_mask = torch.IntTensor([int(x) for x in batch['full_mask']])
+            self.similar_mask = torch.IntTensor([int(x) for x in batch['similar_mask']]).cuda()
+            self.full_mask = torch.IntTensor([int(x) for x in batch['full_mask']]).cuda()
 
             question_embedding = embedder(self.question_vector)
 
@@ -333,12 +303,12 @@ class AndroidTestFramework:
             full_similarities = self.cos_similarity(
                 question_embedding.unsqueeze(1).expand_as(full_embedding),
                 full_embedding
-            ).data.numpy()
+            ).data.cpu().numpy()
 
             similar_similarities = self.cos_similarity(
                 question_embedding.unsqueeze(1).expand_as(similar_embedding),
                 similar_embedding
-            ).data.numpy()
+            ).data.cpu().numpy()
 
 
             for i in range(len(full_similarities)):
@@ -351,7 +321,85 @@ class AndroidTestFramework:
                 )
                 self.AUC.add(comb_similarities, comb_target)
 
-        return self.AUC.value()
+        return self.AUC.value(.05)
+
+
+
+    def visualize_embeddings(self, embedder, filename):
+        question_embedding = embedder(self.question_vector)
+        plt.matshow(question_embedding.data.cpu().numpy())
+        plt.savefig(filename)
+
+
+
+class TFIDFTestFramework:
+    def __init__(self, test, mapping, rep):
+        self.test_set = AndroidTestSet(test, False)
+
+        self.mapping = mapping
+        self.rep = rep
+
+        self.cos_similarity = nn.CosineSimilarity(dim=1, eps=1e-6)
+        self.AUC = AUCMeter()
+
+
+    def metrics(self):
+        # Get embeddings for all the questions
+        # (cases) x (sent_embedding_size)
+        self.AUC.reset()
+        for i, entry in enumerate(self.test_set):
+            if i % 10 == 0:
+                print i
+
+            combined = entry['full'] + entry['similar']
+
+            row, col, values = find(self.rep[self.mapping[entry['q']]])
+
+            combined_tensor = torch.stack((torch.IntTensor(row), torch.IntTensor(col)), dim=0).long()
+
+
+            target_review = torch.sparse.FloatTensor(combined_tensor, torch.FloatTensor(values), torch.Size([1,79066])).to_dense()
+
+
+
+
+            longing = np.zeros(len(combined))
+            for i, review in enumerate(combined):
+                frow, fcol, fvalues = find(self.rep[self.mapping[review]])
+                full_tensor = torch.stack((torch.IntTensor(frow), torch.IntTensor(fcol)), dim=0).long()
+                full_review = torch.sparse.FloatTensor(full_tensor, torch.FloatTensor(fvalues), torch.Size([1,79066])).to_dense()
+                #print type(self.cos_similarity(target_review, full_review))
+                valuation = self.cos_similarity(target_review, full_review).numpy()
+                longing[i] = valuation
+
+            #print longing
+
+
+            comb_similarities = torch.FloatTensor(longing)
+
+
+
+
+
+
+            comb_target = torch.FloatTensor(
+                np.concatenate(([0 for _ in range(entry['full_mask'])], [1 for _ in range(entry['similar_mask'])]))
+            )
+
+            self.AUC.add(comb_similarities, comb_target)
+        #
+        #     for i in range(len(full_similarities)):
+        #         curr_mask, curr_sim_mask = self.full_mask[i], self.similar_mask[i]
+        #         comb_similarities = torch.FloatTensor(
+        #             np.concatenate((full_similarities[i][:curr_mask], similar_similarities[i][:curr_sim_mask]))
+        #         )
+        #         comb_target = torch.FloatTensor(
+        #             np.concatenate(([0 for _ in range(curr_mask)], [1 for _ in range(curr_sim_mask)]))
+        #         )
+        #         self.AUC.add(comb_similarities, comb_target)
+        #
+
+        return self.AUC.value(.05)
 
 
 

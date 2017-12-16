@@ -1,6 +1,10 @@
 import torch
 from torch.utils.data import *
 from tqdm import tqdm
+import numpy as np
+import random
+
+
 
 word_embedding_size = 202
 
@@ -81,6 +85,12 @@ class QuestionBase:
     def __getitem__(self, item):
         return self.questions[item]
 
+    def randomKey(self):
+        entry = -1
+        while entry == -1:
+            entry = random.choice(self.questions.keys())
+        return entry
+
 class TrainSet(Dataset):
     def __init__(self, train, questions):
         self.questions = questions
@@ -103,6 +113,37 @@ class TrainSet(Dataset):
                     'random_title': torch.LongTensor([x[0] for x in random]),
                     'random_body': torch.LongTensor([x[1] for x in random])
                 })
+
+    def __len__(self):
+        return len(self.entries)
+
+    def __getitem__(self, i):
+        return self.entries[i]
+
+
+class AndroidTrainSet(Dataset):
+    def __init__(self, train, ubuntu_questions, android_questions):
+        self.ubuntu_questions = ubuntu_questions
+        self.android_questions = android_questions
+        self.entries = []
+
+
+
+        ubuntu_entry = ubuntu_questions.randomKey()
+
+        android_entry = android_questions.randomKey()
+
+        #ubuntu_entry, android_entry = randint(2, len(self.ubuntu_questions)-1), randint(2, len(self.android_questions)-1)
+
+        ubuntu_title_entry, android_title_entry = self.ubuntu_questions[ubuntu_entry][0], self.android_questions[android_entry][0]
+        ubuntu_body_entry, android_body_entry = self.ubuntu_questions[ubuntu_entry][1], self.android_questions[android_entry][1]
+
+        #entries are 0 if from ubuntu, and 1 if from android
+        self.entries.append({
+            'title' : torch.stack([torch.LongTensor(ubuntu_title_entry), torch.LongTensor(android_title_entry)]),
+            'body' : torch.stack([torch.LongTensor(ubuntu_body_entry), torch.LongTensor(android_body_entry)]),
+            'label': torch.FloatTensor([0, 1])
+        })
 
     def __len__(self):
         return len(self.entries)
@@ -134,8 +175,7 @@ class TestSet:
 
 
 class AndroidTestSet:
-    def __init__(self, test_set, questions):
-        self.questions = questions
+    def __init__(self, test_set, padding=True):
         self.entries = []
         self.pos_set, self.neg_set = test_set
 
@@ -154,7 +194,8 @@ class AndroidTestSet:
                 else:
                     if neg_count != 0:
                         added = len(prev_random)
-                        prev_random.extend([-1 for _ in range(300-len(prev_random))])
+                        if padding:
+                            prev_random.extend([-1 for _ in range(300-len(prev_random))])
                         self.entries.append({
                             'full_mask': added,
                             'current': previous_q,
@@ -167,7 +208,8 @@ class AndroidTestSet:
                 neg_count += 1
 
         added = len(prev_random)
-        prev_random.extend([-1 for _ in range(300-len(prev_random))])
+        if padding:
+            prev_random.extend([-1 for _ in range(300-len(prev_random))])
 
         self.entries.append({
             'full_mask': added,
@@ -189,7 +231,8 @@ class AndroidTestSet:
                 else:
                     if pos_count != 0:
                         previous_length = len(prev_similar)
-                        prev_similar.extend([-1 for _ in range(3-len(prev_similar))])
+                        if padding:
+                            prev_similar.extend([-1 for _ in range(3-len(prev_similar))])
                         entry = self.entries[added]
                         entry['similar'] = prev_similar
                         entry['similar_mask'] = previous_length
@@ -200,7 +243,8 @@ class AndroidTestSet:
                 pos_count += 1
 
         previous_length = len(prev_similar)
-        prev_similar.extend([-1 for _ in range(3-len(prev_similar))])
+        if padding:
+            prev_similar.extend([-1 for _ in range(3-len(prev_similar))])
         entry = self.entries[added]
         entry['similar'] = prev_similar
         entry['similar_mask'] = previous_length

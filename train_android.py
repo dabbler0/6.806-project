@@ -21,8 +21,8 @@ def train(embedder,
             save_dir,
             title_length = 40,
             body_length = 100,
-            batch_size = 100,
-            test_batch_size = 100,
+            batch_size = 10,
+            test_batch_size = 10,
             margin = 0.1,
             epochs = 50,
             lr = 1e-4,
@@ -35,7 +35,7 @@ def train(embedder,
             vectors = 'askubuntu/vector/vectors_pruned.200.txt',
             android_questions_filename = 'android/corpus.tsv',
             ubuntu_questions_filename = 'askubuntu/text_tokenized.txt',
-            train_set = 'askubuntu/train_random.txt',
+            train_set = 'askubuntu/train_small.txt',
             dev_pos_txt = 'android/dev.pos.txt',
             dev_neg_txt = 'android/dev.neg.txt',
             test_neg_txt = 'android/test.neg.txt',
@@ -53,13 +53,22 @@ def train(embedder,
         drop_last = True
     )
 
+
+    android_train_loader = DataLoader(
+        AndroidTrainSet(train_set, ubuntu_questions, android_questions),
+        batch_size = batch_size,
+        shuffle = True,
+        drop_last = True
+    )
+
     full_embedder = FullEmbedder(vocabulary, embedder, body_embedder, merge_strategy = merge_strategy, output_embedding_size = output_embedding_size)
 
     tester = AndroidTestFramework((dev_pos_txt, dev_neg_txt), android_questions, title_length, body_length, test_batch_size)
     master = CosineSimilarityMaster(full_embedder, title_length, body_length, margin)
 
-    # if cuda:
-    #     master = master.cuda()
+    if cuda:
+        master = master.cuda()
+
     optimizer = optim.Adam([param for param in master.parameters() if param.requires_grad], lr = lr)
 
     # Get total number of parameters
@@ -101,20 +110,29 @@ def train(embedder,
         }, signature_file)
 
     best_loss = 0
+    #
+    # for android_batch in tqdm(android_train_loader):
+    #     print "HEEEERRREEE first"
+    #     print android_batch['title'].shape, torch.stack(android_batch['title']).shape
 
     for epoch in range(epochs):
         final_loss = 0.0
         loss_denominator = 0.0
 
         master.train()
+        # for android_batch in tqdm(android_train_loader):
+        #     print "HEEEERRREEE"
+        #     print android_batch['title'].shape, torch.stack(android_batch['title']).shape
+
 
         for i, batch in enumerate(tqdm(train_loader)):
-            # if cuda:
-            #     batchify = lambda v: Variable(torch.stack(v).cuda())
-            # else:
-            batchify = lambda v: Variable(torch.stack(v))
 
-            _, random_indices = torch.rand(100).sort()
+            if cuda:
+                batchify = lambda v: Variable(torch.stack(v).cuda())
+            else:
+                batchify = lambda v: Variable(torch.stack(v))
+
+            _, random_indices = torch.rand(100).cuda().sort()
 
             indices = random_indices[:negative_samples]
 
@@ -126,6 +144,8 @@ def train(embedder,
                 (batchify(batch['random_title'])[:, indices, :],
                     batchify(batch['random_body'])[:, indices, :])
             )
+
+
 
             # Run forward, backward.
             loss = master(q, similar, random).mean()
@@ -156,14 +176,14 @@ def train(embedder,
         if AUC_metric > best_loss:
             torch.save(embedder, best_filename)
 
-        print('Epoch %d: train hinge loss %f, test MAP %0.1f' % (epoch, final_loss / loss_denominator, int(AUC_metric* 1000) / 10.0))
+        #print('Epoch %d: train hinge loss %f, test MAP %0.1f' % (epoch, final_loss / loss_denominator, int(AUC_metric* 1000) / 10.0))
 
 
 train(
     embedder = CNN(), #False),
     save_dir='models/cnn',
-    batch_size = 100,
-    test_batch_size = 100,
+    batch_size = 200,
+    test_batch_size = 200,
     lr = 1e-4,
 
     title_length = 40,
@@ -171,7 +191,7 @@ train(
     alpha = 0,
 
     body_embedder = CNN(),
-    body_length = 100,
+    body_length = 50,
     merge_strategy = 'mean',
     output_embedding_size = 400,
 

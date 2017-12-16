@@ -315,6 +315,6 @@ class TwoLayerDiscriminator(nn.Module):
         self.second_layer = nn.Linear(hidden_size, 2)
 
     def forward(self, x):
-        return F.softmax(
+        return F.log_softmax(
             self.second_layer(F.relu(self.first_layer(x)))
         )

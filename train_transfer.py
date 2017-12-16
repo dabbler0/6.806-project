@@ -111,6 +111,7 @@ def train(embedder,
 
     for epoch in range(epochs):
         final_loss = 0.0
+        discrim_loss = 0.0
         loss_denominator = 0.0
 
         master.train()
@@ -161,6 +162,7 @@ def train(embedder,
             discrim_error = F.nll_loss(label_predictions, target)
 
             final_loss += loss.data[0]
+            discrim_loss += discrim_error.data[0]
 
             # Subtract the discimrinator error to the label error
             loss -= alpha * discrim_error
@@ -178,7 +180,6 @@ def train(embedder,
         AUC_metric = tester.metrics(full_embedder)
         print('Epoch %d: AUC score = %f' % (epoch, AUC_metric))
 
-
         save_filename = os.path.join(save_dir, 'epoch%d-loss%f.pkl' % (epoch, AUC_metric))
         fig_filename = os.path.join(save_dir, 'epoch%d-loss%f-vectors.png' % (epoch, AUC_metric))
 
@@ -188,19 +189,19 @@ def train(embedder,
         if AUC_metric > best_loss:
             torch.save((discriminator, full_embedder), best_filename)
 
-        print('Epoch %d: train hinge loss %f, test MAP %0.1f' % (epoch, final_loss / loss_denominator, int(AUC_metric* 1000) / 10.0))
+        print('Epoch %d: train hinge loss %f, discrim loss %f, test %0.1f' % (epoch, final_loss / loss_denominator, discrim_loss / loss_denominator, int(AUC_metric* 1000) / 10.0))
 
 unified = GRUAverage(input_size = 302, hidden_size = 190)
 train(
     embedder = unified,
-    save_dir = 'models/gru-domain-adaptation-low-alpha',
+    save_dir = 'models/gru-domain-adaptation-highest-alpha',
     batch_size = 100,
     test_batch_size = 10,
-    lr = 1e-4,
+    lr = 3e-4,
 
     title_length = 40,
     negative_samples = 20,
-    alpha = 1e-6,
+    alpha = 1e-3,
 
     body_embedder = unified,
     body_length = 100,

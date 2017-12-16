@@ -195,14 +195,14 @@ def train(embedder,
 unified = GRUAverage(input_size = 302, hidden_size = 190)
 train(
     embedder = unified,
-    save_dir = 'models/gru-domain-adaptation-slow-moving-alpha',
+    save_dir = 'models/gru-domain-adaptation-superslow-moving-alpha',
     batch_size = 100,
     test_batch_size = 10,
     lr = 3e-4,
 
     title_length = 40,
     negative_samples = 20,
-    alpha = 1e-3,
+    alpha = 0.25,
 
     body_embedder = unified,
     body_length = 100,

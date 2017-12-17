@@ -157,26 +157,26 @@ def train(embedder,
 
         print('Epoch %d: train hinge loss = %f, test MAP = %f, test MRR = %f \n, precision@1 = %f, precision@5 = %f' % (epoch, final_loss / loss_denominator, mean_average_precision, mean_reciprocal_rank, precision_at_n[0], precision_at_n[4]))
 
+if __name__ == '__main__':
+    # Example CNN model
+    cnn_model = CNN()
 
-cnn_model = CNN()
-#gru_model = GRUAverage(hidden_size = 190, bidirectional = True, input_size = 202)
+    train(
+        cnn_model,
+        'models/cnn-1',
+        batch_size = 50,
+        lr = 1e-4,
 
-train(
-    cnn_model,
-    'models/cnn-1',
-    batch_size = 50,
-    lr = 1e-4,
+        title_length = 40,
+        negative_samples = 20,
+        alpha = 0,
 
-    title_length = 40,
-    negative_samples = 20,
-    alpha = 0,
+        vectors = 'askubuntu/vector/vectors_pruned.200.txt',
 
-    vectors = 'askubuntu/vector/vectors_pruned.200.txt',
+        body_embedder = cnn_model,
+        body_length = 100,
+        merge_strategy = 'mean',
 
-    body_embedder = cnn_model,
-    body_length = 100,
-    merge_strategy = 'mean',
-
-    epochs = 50,
-    margin = 0.2
-)
+        epochs = 50,
+        margin = 0.2
+    )

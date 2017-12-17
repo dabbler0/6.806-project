@@ -126,16 +126,18 @@ def train(
         print('Epoch %d: train loss %f, dev AUC %0.1f' %
             (epoch, final_loss / loss_denominator, int(AUC_metric* 1000) / 10.0))
 
-train(
-    save_dir = 'models/gru-summarizer-interlinear',
-    batch_size = 100,
-    test_batch_size = 10,
-    lr = 3e-4,
+if __name__ == '__main__':
+    # Nothing really worked here
+    train(
+        save_dir = 'models/gru-summarizer-interlinear',
+        batch_size = 100,
+        test_batch_size = 10,
+        lr = 3e-4,
 
-    title_length = 40,
+        title_length = 40,
 
-    body_length = 100,
-    vectors = 'glove/glove.840B.300d.txt',
+        body_length = 100,
+        vectors = 'glove/glove.840B.300d.txt',
 
-    epochs = 50
-)
+        epochs = 50
+    )

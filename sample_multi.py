@@ -1,3 +1,9 @@
+'''
+Sampling script that draws a TSNE plot of embeddings,
+coloring questions from different corpora differently. For
+domain adaptation sanity-checking.
+'''
+
 import torch
 torch.manual_seed(0)
 

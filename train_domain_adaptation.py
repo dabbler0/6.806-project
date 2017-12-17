@@ -32,7 +32,6 @@ def train(embedder,
             merge_strategy = 'mean',
             negative_samples = 20,
             output_embedding_size = 0,
-            alpha = 1e-4,
             discriminator = None,
             vectors = 'askubuntu/vector/vectors_pruned.200.txt',
             android_questions_filename = 'android/corpus.tsv',
@@ -94,7 +93,6 @@ def train(embedder,
             'batch_size': batch_size,
             'margin': margin,
             'epochs': epochs,
-            'alpha': alpha,
             'negative_samples': negative_samples,
             'lr': lr,
             'cuda': cuda,
@@ -193,27 +191,28 @@ def train(embedder,
         print('Epoch %d: train hinge loss %f, discrim loss %f, test AUC %0.1f' %
             (epoch, final_loss / loss_denominator, discrim_loss / loss_denominator, int(AUC_metric* 1000) / 10.0))
 
-unified = GRUAverage(input_size = 302, hidden_size = 190)
+if __name__ == '__main__':
+    # The best model had these hyperparameters
+    unified = GRUAverage(input_size = 302, hidden_size = 190)
 
-train(
-    embedder = unified,
-    save_dir = 'models/gru-domain-adaptation-trained-embeddings',
-    batch_size = 100,
-    test_batch_size = 10,
-    lr = 3e-4,
+    train(
+        embedder = unified,
+        save_dir = 'models/gru-domain-adaptation',
+        batch_size = 100,
+        test_batch_size = 10,
+        lr = 3e-4,
 
-    title_length = 40,
-    negative_samples = 20,
-    alpha = 0.25,
+        title_length = 40,
+        negative_samples = 20,
 
-    body_embedder = unified,
-    body_length = 100,
-    merge_strategy = 'mean',
-    output_embedding_size = 400,
-    vectors = 'glove/glove.840B.300d.txt',
+        body_embedder = unified,
+        body_length = 100,
+        merge_strategy = 'mean',
+        output_embedding_size = 400,
+        vectors = 'glove/glove.840B.300d.txt',
 
-    discriminator = TwoLayerDiscriminator(380, 380),
+        discriminator = TwoLayerDiscriminator(380, 380),
 
-    epochs = 20,
-    margin = 0.2
-)
+        epochs = 20,
+        margin = 0.2
+    )

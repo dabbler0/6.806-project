@@ -153,18 +153,20 @@ def train(
 
         print('Epoch %d: train dist %f, train reg loss %f, test AUC %0.1f' % (epoch, final_loss / loss_denominator, final_reg / loss_denominator, int(AUC_metric* 1000) / 10.0))
 
-train(
-    save_dir = 'models/gru-dual-severe',
-    batch_size = 100,
-    test_batch_size = 10,
-    lr = 3e-4,
+if __name__ == '__main__':
+    # The best model had these hyperparameters.
+    train(
+        save_dir = 'models/gru-dual-severe',
+        batch_size = 100,
+        test_batch_size = 10,
+        lr = 3e-4,
 
-    schedule = lambda x: 10 * x + 1,
+        schedule = lambda x: 10 * x + 1,
 
-    title_length = 40,
+        title_length = 40,
 
-    body_length = 100,
-    vectors = 'glove/glove.840B.300d.txt',
+        body_length = 100,
+        vectors = 'glove/glove.840B.300d.txt',
 
-    epochs = 20
-)
+        epochs = 20
+    )

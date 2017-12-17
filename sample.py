@@ -1,3 +1,9 @@
+'''
+Sampling script that creates a TSNE plot of embeddings
+for randomly drawn questions. Mostly for sanity-checking
+and for fun to see how embeddings can reflect meaning.
+'''
+
 import torch
 torch.manual_seed(0)
 
@@ -80,8 +86,9 @@ def sample(full_embedder,
     plt.savefig(output)
 
 
-#sample(torch.load('models/best-gru-model/best.pkl'), 'models/tsne-plot.png')
-sample(torch.load('models/gru-summarizer-fixed/best.pkl')[0], 'models/summarizer-tsne-plot.png',
-    vectors = 'glove/glove.840B.300d.txt',
-    questions_filename = 'Android/corpus.tsv',
-    num_points = 500)
+if __name__ == '__main__':
+    sample(torch.load('models/gru-summarizer-fixed/best.pkl')[0],
+        'models/summarizer-tsne-plot.png',
+        vectors = 'glove/glove.840B.300d.txt',
+        questions_filename = 'Android/corpus.tsv',
+        num_points = 500)

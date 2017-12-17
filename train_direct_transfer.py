@@ -161,24 +161,26 @@ def train(embedder,
         print('Epoch %d: train hinge loss %f, test AUC %0.1f' %
                 (epoch, final_loss / loss_denominator, int(AUC_metric* 1000) / 10.0))
 
-unified = GRUAverage(input_size = 302, hidden_size = 190)
-train(
-    embedder = unified,
-    save_dir = 'models/gru-direct-transfer-fixed',
-    batch_size = 80,
-    test_batch_size = 10,
-    lr = 3e-4,
+if __name__ == '__main__':
+    # The best model had these hyperparameters
+    unified = GRUAverage(input_size = 302, hidden_size = 190)
+    train(
+        embedder = unified,
+        save_dir = 'models/gru-direct-transfer-fixed',
+        batch_size = 80,
+        test_batch_size = 10,
+        lr = 3e-4,
 
-    title_length = 40,
-    negative_samples = 20,
-    alpha = 0,
+        title_length = 40,
+        negative_samples = 20,
+        alpha = 0,
 
-    body_embedder = unified,
-    body_length = 100,
-    merge_strategy = 'mean',
-    output_embedding_size = 400,
-    vectors = 'glove/glove.840B.300d.txt',
+        body_embedder = unified,
+        body_length = 100,
+        merge_strategy = 'mean',
+        output_embedding_size = 400,
+        vectors = 'glove/glove.840B.300d.txt',
 
-    epochs = 50,
-    margin = 0.2
-)
+        epochs = 50,
+        margin = 0.2
+    )

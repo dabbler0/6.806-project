@@ -10,7 +10,7 @@ word_embedding_size = 202
 Vocabulary and tokenizers
 '''
 class Vocabulary:
-    def __init__(self, fname, prune_corpora, unprune_corpus, additional_words = 500):
+    def __init__(self, fname, prune_corpora, additional_words = 500, **keyword_parameters):
         # Token 0 is the padding token.
         # Token 1 is the unknown token.
         self.vocabulary = ['__EOS__', '__UNK__']
@@ -28,14 +28,16 @@ class Vocabulary:
                     prune_candidates.update(words)
 
         frequencies = {}
-        with open(unprune_corpus) as corpus:
-            for line in corpus:
-                qid, title, body = line.split('\t')
-                words = [x.lower().strip() for x in title.split(' ') + body.split(' ')]
-                for word in words:
-                    if word not in frequencies:
-                        frequencies[word] = 0
-                    frequencies[word] += 1
+        if 'unprune_corpus' in keyword_parameters:
+            unprune_corpus = keyword_parameters['unprune_corpus']
+            with open(unprune_corpus) as corpus:
+                for line in corpus:
+                    qid, title, body = line.split('\t')
+                    words = [x.lower().strip() for x in title.split(' ') + body.split(' ')]
+                    for word in words:
+                        if word not in frequencies:
+                            frequencies[word] = 0
+                        frequencies[word] += 1
 
         most_common_words = sorted(frequencies, key = lambda k: -frequencies[k])
 
@@ -45,7 +47,7 @@ class Vocabulary:
 
                 # Only include words that appear in one of the corpora (if any exist)
                 if word in prune_candidates or len(prune_corpora) == 0:
-                    vector = [float(x) for x in line[line.index(' '):].split(' ')[1:] if len(x) > 0]
+                    vector = [float(x) for x in line[line.index(' '):].split(' ')[1:] if x != '\n']
 
                     # Add padding and UNK tokens
                     if len(self.embedding) == 0:

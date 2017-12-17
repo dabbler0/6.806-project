@@ -17,10 +17,13 @@ class CNN(nn.Module):
         self.conv = nn.Conv1d(input_size, self.hidden_size, kernel_size=3, padding=1)
 
     def forward(self, x, padding_mask):
+        print type(padding_mask)
+        padding_mask = padding_mask.float()
         x = x.transpose(1, 2)
         x = self.conv(x)
         x = F.relu(x)
         x = self.dropout(x)
+        print type(padding_mask), type(x)
         x = (padding_mask.unsqueeze(2)*x.transpose(1, 2)).sum(1)/padding_mask.sum(1).unsqueeze(1)
         return x
 

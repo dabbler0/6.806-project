@@ -161,11 +161,11 @@ def train(embedder,
 
 
 #cnn_model = CNN()
-gru_model = GRUAverage(hidden_size = 190, bidirectional = True, input_size = 302)
+gru_model = GRUAverage(hidden_size = 190, bidirectional = True, input_size = 202)
 
 train(
     gru_model,
-    'models/gru-unified-glove',
+    'models/gru-1',
     batch_size = 50,
     lr = 1e-4,
 
@@ -173,12 +173,12 @@ train(
     negative_samples = 20,
     alpha = 0,
 
-    vectors = 'glove/glove.840B.300d.txt',
+    vectors = 'askubuntu/vector/vectors_pruned.200.txt',
 
     body_embedder = gru_model,
     body_length = 100,
     merge_strategy = 'mean',
 
-    epochs = 1,
+    epochs = 50,
     margin = 0.2
 )

@@ -198,6 +198,7 @@ train(
     embedder = unified,
     save_dir = 'models/gru-domain-adaptation-trained-embeddings',
     batch_size = 100,
+    mixed_size = 20,
     test_batch_size = 10,
     lr = 3e-4,
 

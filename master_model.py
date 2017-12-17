@@ -284,37 +284,36 @@ class AndroidTestFramework:
         self.AUC.reset()
         for i, batch in enumerate(tqdm(self.test_loader)):
 
-            self.question_title_vector = torch.LongTensor([
+            self.question_title_vector = Variable(torch.LongTensor([
                 self.test_set.questions[x][0] for x in batch['q']
-            ]).cuda()
+            ]).cuda())
 
-            self.question_body_vector = torch.LongTensor([
+            self.question_body_vector = Variable(torch.LongTensor([
                 self.test_set.questions[x][1] for x in batch['q']
-            ]).cuda()
+            ]).cuda())
 
             # LongTensor of (cases) x (num_full) x (trunc_length)
-            self.full_title_vector = torch.LongTensor([
+            self.full_title_vector = Variable(torch.LongTensor([
                 [self.test_set.questions[y][0] for y in x]
                 for x in batch['full']
-            ]).cuda().transpose(0, 1).contiguous()
+            ]).cuda().transpose(0, 1).contiguous())
 
-
-            self.full_body_vector = torch.LongTensor([
+            self.full_body_vector = Variable(torch.LongTensor([
                 [self.test_set.questions[y][1] for y in x]
                 for x in batch['full']
-            ]).cuda().transpose(0, 1).contiguous()
+            ]).cuda().transpose(0, 1).contiguous())
 
             # LongTensor of (cases) x (num_full) x (trunc_length)
-            self.similar_title_vector = torch.LongTensor([
+            self.similar_title_vector = Variable(torch.LongTensor([
                 [self.test_set.questions[y][0] for y in x]
                 for x in batch['similar']
-            ]).cuda().transpose(0, 1).contiguous()
+            ]).cuda().transpose(0, 1).contiguous())
 
 
-            self.similar_body_vector = torch.LongTensor([
+            self.similar_body_vector = Variable(torch.LongTensor([
                 [self.test_set.questions[y][1] for y in x]
                 for x in batch['similar']
-            ]).cuda().transpose(0, 1).contiguous()
+            ]).cuda().transpose(0, 1).contiguous())
 
             self.question_vector = (self.question_title_vector, self.question_body_vector)
 

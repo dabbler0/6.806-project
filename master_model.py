@@ -135,53 +135,7 @@ class CosineSimilarityMaster(nn.Module):
         # which is our intention.
         return F.relu(maximum_random_similarity - similar_similarity)
 
-class TestFramework:
-    def __init__(self, test, questions, title_length, body_length, cuda = True):
-        self.test_set = TestSet(test, questions)
 
-        self.title_length = title_length
-        self.body_length = body_length
-
-        self.cos_similarity = nn.CosineSimilarity(dim=2, eps=1e-6)
-
-        # LongTensor of (cases) x (trunc_length)
-        self.question_title_vector = torch.LongTensor([
-            self.test_set.questions[x['q']][0] for x in self.test_set.entries
-        ])
-        self.question_body_vector = torch.LongTensor([
-            self.test_set.questions[x['q']][1] for x in self.test_set.entries
-        ])
-
-        # LongTensor of (cases) x (num_full) x (trunc_length)
-        self.full_title_vector = torch.LongTensor([
-            [self.test_set.questions[y][0] for y in x['full']]
-            for x in self.test_set.entries
-        ])
-
-        self.full_body_vector = torch.LongTensor([
-            [self.test_set.questions[y][1] for y in x['full']]
-            for x in self.test_set.entries
-        ])
-
-        self.similar_sets = [
-            set(x['full'].index(i) for i in x['similar'] if i in x['full'])
-            for x in self.test_set.entries
-        ]
-
-        if cuda:
-            self.question_title_vector = self.question_title_vector.cuda()
-            self.full_title_vector = self.full_title_vector.cuda()
-
-            self.question_body_vector = self.question_body_vector.cuda()
-            self.full_body_vector = self.full_body_vector.cuda()
-
-        self.question_title_vector = Variable(self.question_title_vector)
-        self.full_title_vector = Variable(self.full_title_vector)
-
-        self.question_body_vector = Variable(self.question_body_vector)
-        self.full_body_vector = Variable(self.full_body_vector)
-
-        self.question_vector = (self.question_title_vector, self.question_body_vector)
 
 class TestFramework:
     def __init__(self, test, questions, title_length, body_length, cuda = True):
@@ -193,22 +147,23 @@ class TestFramework:
         self.cos_similarity = nn.CosineSimilarity(dim=2, eps=1e-6)
 
         # LongTensor of (cases) x (trunc_length)
-        self.question_title_vector = torch.LongTensor([
+        self.question_title_vector = Variable(torch.LongTensor([
             self.test_set.questions[x['q']][0] for x in self.test_set.entries
-        ])
-        self.question_body_vector = torch.LongTensor([
+        ]))
+        self.question_body_vector = Variable(torch.LongTensor([
             self.test_set.questions[x['q']][1] for x in self.test_set.entries
-        ])
+        ]))
 
         # LongTensor of (cases) x (num_full) x (trunc_length)
-        self.full_title_vector = torch.LongTensor([
+        self.full_title_vector = Variable(torch.LongTensor([
             [self.test_set.questions[y][0] for y in x['full']]
             for x in self.test_set.entries
-        ])
-        self.full_body_vector = torch.LongTensor([
+        ]))
+
+        self.full_body_vector = Variable(torch.LongTensor([
             [self.test_set.questions[y][1] for y in x['full']]
             for x in self.test_set.entries
-        ])
+        ]))
 
         self.similar_sets = [
             set(x['full'].index(i) for i in x['similar'] if i in x['full'])
@@ -224,7 +179,9 @@ class TestFramework:
 
         self.question_vector = (self.question_title_vector, self.question_body_vector)
 
-    def mean_average_precision(self, embedder):
+
+
+    def metrics(self, embedder):
         # Get embeddings for all the questions
         # (cases) x (sent_embedding_size)
         question_embedding = embedder(self.question_vector)
@@ -249,7 +206,11 @@ class TestFramework:
 
         # Now, just in interpreted Python, determine MAP.
         mean_average_precision = 0.0
+        mean_reciprocal_rank = 0.0
+        precision_at_5n = np.zeros(5)
+
         samples = 0
+        total_samples = 0
         for i, case in enumerate(indices):
             avg_precision = 0.0
             num_recalls = 0.0
@@ -257,21 +218,36 @@ class TestFramework:
             correct_so_far = 0.0
             total_so_far = 0.0
 
+            reciprocal_rank = 0.0
+            precision_at_case_5n = np.zeros(5)
+
+            first_examined = False
             for j, candidate in enumerate(case):
+
                 candidate = candidate.data[0]
                 total_so_far += 1
                 if candidate in self.similar_sets[i]:
                     # For each new possible recall, get precision
                     correct_so_far += 1
                     avg_precision += (correct_so_far / total_so_far)
+                    if not first_examined:
+                        reciprocal_rank = 1/float(total_so_far)
+                        first_examined = True
                     num_recalls += 1
+
+                if j < 5:
+                    precision_at_case_5n[j] = num_recalls/total_so_far
+
 
             if num_recalls > 0:
                 avg_precision /= num_recalls
                 mean_average_precision += avg_precision
+                mean_reciprocal_rank += reciprocal_rank
+                precision_at_5n = np.sum((precision_at_5n, precision_at_case_5n), axis=0)
                 samples += 1
 
-        return mean_average_precision / samples
+        return (mean_average_precision / samples, mean_reciprocal_rank / samples, precision_at_5n / samples)
+
 
     def visualize_embeddings(self, embedder, filename):
         question_embedding = embedder(self.question_vector)

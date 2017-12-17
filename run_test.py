@@ -21,16 +21,19 @@ def test(filename,
          title_length = 40,
          body_length = 100,
          batch_size = 100,
-         test_batch_size = 100):
+         test_batch_size = 100,
+         vectors = 'askubuntu/vector/vectors_pruned.200.txt',
+         ubuntu_questions_filename = 'askubuntu/text_tokenized.txt',
+         test_set = 'askubuntu/test.txt'):
 
     full_embedder = torch.load(filename)
-    vocabulary = Vocabulary(vectors, [ubuntu_questions_filename], android_questions_filename)
+    vocabulary = Vocabulary(vectors, [ubuntu_questions_filename])
 
     ubuntu_questions = QuestionBase(ubuntu_questions_filename, vocabulary, title_length, body_length)
-    android_questions = QuestionBase(android_questions_filename, vocabulary, title_length, body_length)
+    #android_questions = QuestionBase(android_questions_filename, vocabulary, title_length, body_length)
 
-    tester = TestFramework(dev_set, questions, title_length, body_length)
-    android_tester = AndroidTestFramework((dev_pos_txt, dev_neg_txt), android_questions, title_length, body_length, test_batch_size, num_examples = 100)
+    tester = TestFramework(test_set, ubuntu_questions, title_length, body_length)
+    #android_tester = AndroidTestFramework((dev_pos_txt, dev_neg_txt), android_questions, title_length, body_length, test_batch_size, num_examples = 100)
 
     mean_average_precision, mean_reciprocal_rank, precision_at_n = tester.metrics(full_embedder)
 

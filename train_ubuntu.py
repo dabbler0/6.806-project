@@ -149,6 +149,9 @@ def train(embedder,
         save_filename = os.path.join(save_dir, 'epoch%d-loss%f-map%f.pkl' % (epoch, test_error, mean_average_precision))
         fig_filename = os.path.join(save_dir, 'epoch%d-loss%f-vectors.png' % (epoch, test_error))
 
+        # Visualize the vector embeddings, as a sanity check
+        # so that we can see if the vectors are all the same,
+        # or some other pathological case like that.
         tester.visualize_embeddings(full_embedder, fig_filename)
 
         torch.save(full_embedder, save_filename)

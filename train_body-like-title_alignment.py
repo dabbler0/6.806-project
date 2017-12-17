@@ -145,6 +145,9 @@ def train(
         save_filename = os.path.join(save_dir, 'epoch%d-loss%f.pkl' % (epoch, AUC_metric))
         fig_filename = os.path.join(save_dir, 'epoch%d-loss%f-vectors.png' % (epoch, AUC_metric))
 
+        # Visualize the vector embeddings, as a sanity check
+        # so that we can see if the vectors are all the same,
+        # or some other pathological case like that.
         tester.visualize_embeddings(full_embedder, fig_filename)
 
         torch.save(full_embedder, save_filename)

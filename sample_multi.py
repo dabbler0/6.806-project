@@ -33,16 +33,18 @@ def sample(full_embedder,
             output,
             title_length = 40,
             body_length = 100,
-            vectors = 'askubuntu/vector/vectors_pruned.200.txt',
+            vectors = 'glove/glove.840B.300d.txt',
             samples_size = 100,
-            questions_files = ['askubuntu/text_tokenized.txt'])
+            questions_files = ['askubuntu/text_tokenized.txt', 'android/corpus.tsv'],
+            prune_corpora = ['android/corpus.tsv'],
+            unprune_corpora = None):
 
-    vocabulary = Vocabulary(vectors)
+    vocabulary = Vocabulary(vectors, prune_corpora, unprune_corpora)
 
     titles, bodies = [], []
 
     for question_file in questions_files:
-        question_base = QuestionBase(questions_filename, vocabulary, title_length, body_length)
+        question_base = QuestionBase(question_file, vocabulary, title_length, body_length)
         title, body = question_base.get_random_batch(100)
 
         titles.append(title)
@@ -52,7 +54,7 @@ def sample(full_embedder,
     body = torch.cat(bodies, dim = 0)
 
     # (samples) x (embedding_size)
-    vectors = full_embedder(title, body)
+    vectors = full_embedder((title, body))
 
     # Dot product matrix
     # (samples) x (samples)
@@ -70,14 +72,6 @@ def sample(full_embedder,
     tsne = TSNE(metric='precomputed')
     embedding = tsne.fit_transform(angular_similarities.data.cpu().numpy())
 
-    # Load question file
-    qdict = {}
-    with open(questions_filename) as question_file:
-        for line in question_file:
-            qid, title, body = line.split('\t')
-            qid = int(qid)
-            qdict[qid] = title.decode('ascii', 'ignore')
-
     plt.figure(figsize=(20,20))
 
     colors = 'rgb'
@@ -87,4 +81,4 @@ def sample(full_embedder,
     plt.savefig(output)
 
 if __name__ == '__main__':
-    sample(torch.load('models/best-gru-model/best.pkl'), 'models/tsne-plot.png')
+    sample(torch.load('models/gru-dual-severe/best.pkl'), 'models/tsne-plot.png')

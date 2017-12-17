@@ -29,8 +29,6 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-version = 'third_versioned; batchnorm'
-
 def sample(full_embedder,
             output,
             title_length = 40,

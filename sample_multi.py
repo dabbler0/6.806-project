@@ -29,8 +29,6 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
-version = 'third_versioned; batchnorm'
-
 def sample(full_embedder,
             output,
             title_length = 40,
@@ -88,5 +86,5 @@ def sample(full_embedder,
 
     plt.savefig(output)
 
-
-sample(torch.load('models/best-gru-model/best.pkl'), 'models/tsne-plot.png')
+if __name__ == '__main__':
+    sample(torch.load('models/best-gru-model/best.pkl'), 'models/tsne-plot.png')

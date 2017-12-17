@@ -15,7 +15,7 @@ import itertools
 import os
 import json
 
-version = 'third_versioned; batchnorm'
+version = 'submitted'
 
 # Hyperparameters
 def train(embedder,

@@ -3,7 +3,7 @@ torch.manual_seed(0)
 
 from master_model import *
 from data import *
-from simple_models import *
+from architectures import *
 
 from tqdm import tqdm
 
@@ -158,7 +158,8 @@ def train(embedder,
         if AUC_metric > best_loss:
             torch.save(full_embedder, best_filename)
 
-        print('Epoch %d: train hinge loss %f, test MAP %0.1f' % (epoch, final_loss / loss_denominator, int(AUC_metric* 1000) / 10.0))
+        print('Epoch %d: train hinge loss %f, test AUC %0.1f' %
+                (epoch, final_loss / loss_denominator, int(AUC_metric* 1000) / 10.0))
 
 unified = GRUAverage(input_size = 302, hidden_size = 190)
 train(

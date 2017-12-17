@@ -3,7 +3,7 @@ torch.manual_seed(0)
 
 from master_model import *
 from data import *
-from simple_models import *
+from architectures import *
 
 import math
 

@@ -3,7 +3,7 @@ torch.manual_seed(0)
 
 from master_model import *
 from data import *
-from simple_models import *
+from architectures import *
 
 import math
 
@@ -75,29 +75,7 @@ def sample(full_embedder,
     bottom_side = []
 
     for i, question in enumerate(qids):
-        plt.annotate(len(qdict[question].split(' ')), (embedding[i, 0], embedding[i, 1]))
-
-        if embedding[i, 0] > 0:
-            top_side.append(qdict[question].split(' ')[0])
-        else:
-            bottom_side.append(qdict[question].split(' ')[0])
-
-    print(top_side)
-    print(bottom_side)
-
-    tc = {}
-    for x in top_side:
-        if x not in tc:
-            tc[x] = 0
-        tc[x] += 1
-    bc = {}
-    for x in bottom_side:
-        if x not in bc:
-            bc[x] = 0
-        bc[x] += 1
-
-    print(tc)
-    print(bc)
+        plt.annotate(qdict[question].split(' '), (embedding[i, 0], embedding[i, 1]))
 
     plt.savefig(output)
 

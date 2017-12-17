@@ -3,7 +3,7 @@ torch.manual_seed(0)
 
 from master_model import *
 from data import *
-from simple_models import *
+from architectures import *
 
 from tqdm import tqdm
 
@@ -180,7 +180,6 @@ def train(embedder,
 
         # Run test
         AUC_metric = tester.metrics(full_embedder)
-        print('Epoch %d: AUC score = %f' % (epoch, AUC_metric))
 
         save_filename = os.path.join(save_dir, 'epoch%d-loss%f.pkl' % (epoch, AUC_metric))
         fig_filename = os.path.join(save_dir, 'epoch%d-loss%f-vectors.png' % (epoch, AUC_metric))
@@ -191,7 +190,8 @@ def train(embedder,
         if AUC_metric > best_loss:
             torch.save((discriminator, full_embedder), best_filename)
 
-        print('Epoch %d: train hinge loss %f, discrim loss %f, test %0.1f' % (epoch, final_loss / loss_denominator, discrim_loss / loss_denominator, int(AUC_metric* 1000) / 10.0))
+        print('Epoch %d: train hinge loss %f, discrim loss %f, test AUC %0.1f' %
+            (epoch, final_loss / loss_denominator, discrim_loss / loss_denominator, int(AUC_metric* 1000) / 10.0))
 
 unified = GRUAverage(input_size = 302, hidden_size = 190)
 

@@ -3,7 +3,7 @@ torch.manual_seed(0)
 
 from master_model import *
 from data import *
-from simple_models import *
+from architectures import *
 
 from tqdm import tqdm
 
@@ -106,9 +106,9 @@ def train(
             # Take cosine similarities
             # Denominator is (batch_size) x 1 X 1 x (batch_size)
             # For outer product
-            title_mags = title_dots.diag().unsqueeze(1)
+            title_mags = title_dots.diag().unsqueeze(1) ** 0.5
             title_denoms = torch.mm(title_mags, title_mags.transpose(0, 1))
-            body_mags = body_dots.diag().unsqueeze(1)
+            body_mags = body_dots.diag().unsqueeze(1) ** 0.5
             body_denoms = torch.mm(body_mags, body_mags.transpose(0, 1))
 
             title_sims = title_dots / title_mags
@@ -123,6 +123,7 @@ def train(
             final_loss += loss.data[0]
             final_reg += reg.data[0]
 
+            # Move lambda according to schedule
             l = schedule(float(epoch) / epochs)
 
             loss += l * reg
@@ -140,7 +141,6 @@ def train(
 
         # Run test
         AUC_metric = tester.metrics(full_embedder)
-        print('Epoch %d: AUC score = %f' % (epoch, AUC_metric))
 
         save_filename = os.path.join(save_dir, 'epoch%d-loss%f.pkl' % (epoch, AUC_metric))
         fig_filename = os.path.join(save_dir, 'epoch%d-loss%f-vectors.png' % (epoch, AUC_metric))

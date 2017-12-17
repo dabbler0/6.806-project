@@ -1,3 +1,7 @@
+'''
+Data loading utilities.
+'''
+
 import torch
 from torch.utils.data import *
 from tqdm import tqdm
@@ -10,6 +14,12 @@ word_embedding_size = 202
 Vocabulary and tokenizers
 '''
 class Vocabulary:
+    '''
+    Vocabulary, which loads and stores a word embedding. Includes options
+    for prune_corpora to prune words that don't appear in those corpora, as well
+    as an unprune_corpus, where the most frequent words from that corpus that
+    don't already appear in the embedding are added, randomly-initialized.
+    '''
     def __init__(self, fname, prune_corpora, additional_words = 500, unprune_corpus = None):
         # Token 0 is the padding token.
         # Token 1 is the unknown token.
@@ -27,6 +37,10 @@ class Vocabulary:
                     words = [x.lower().strip() for x in title.split(' ') + body.split(' ')]
                     prune_candidates.update(words)
 
+        # We include an option to add randomly-initialized
+        # word embeddings from an "unprune corpus". The (additional_words)
+        # most frequent words are added. Count all the words
+        # in the unprune corpus so that we can determine frequency ordering
         frequencies = {}
         if unprune_corpus is not None:
             with open(unprune_corpus) as corpus:
@@ -40,6 +54,7 @@ class Vocabulary:
 
             most_common_words = sorted(frequencies, key = lambda k: -frequencies[k])
 
+        # Load the word embeddings file
         with open(fname) as vocab_file:
             for line in tqdm(vocab_file, desc='load vocab'):
                 word = line[:line.index(' ')].lower()
@@ -60,11 +75,12 @@ class Vocabulary:
                     self.vocabulary.append(word)
                     self.embedding.append(vector)
 
+        # Now add however many words we want
+        # from the unprune corpus
         if unprune_corpus is not None:
             number_added = 0
             for word in most_common_words:
                 if word not in self.word_to_idx:
-                    print('Adding word', word, frequencies[word])
                     # Add this word as a random vector
                     self.word_to_idx[word] = len(self.vocabulary)
                     self.vocabulary.append(word)
@@ -77,9 +93,11 @@ class Vocabulary:
                     if number_added >= additional_words:
                         break
 
+        # Store embedding as a tensor
         self.embedding = torch.Tensor(self.embedding)
 
     def to_idx(self, word):
+        # Word-to-index function
         if word in self.word_to_idx:
             return self.word_to_idx[word]
         return 1
@@ -101,6 +119,11 @@ class Question:
         self.body = body
 
 class QuestionBase:
+    '''
+    QuestionBase, which stores a bunch of questions from somewhere
+    as LongTensors of indices into the embedding of a vocabulary.
+    Also capable of drawing random batches
+    '''
     def __init__(self, questions, vocabulary, title_length, body_length):
         self.questions = {-1: ([1] + [0] * (title_length - 1), [1] + [0] * (body_length - 1))}
         self.vocabulary = vocabulary
@@ -118,7 +141,7 @@ class QuestionBase:
 
                 self.all_qids.append(qid)
 
-                # Add dimension that flags whether we are in the title or the body
+                # Load title and body separately
                 title = [vocabulary.to_idx(t.lower().strip()) for t in title.split(' ')]
                 if len(title) <= title_length:
                     title += [0] * (title_length - len(title))
@@ -168,6 +191,10 @@ class QuestionBase:
         return self.questions[item]
 
 class TrainSet(Dataset):
+    '''
+    Stores a training set as formatted in the AskUbuntu
+    corpus, and can be loaded through torch's DataLoaders.
+    '''
     def __init__(self, train, questions):
         self.questions = questions
         self.entries = []
@@ -201,6 +228,9 @@ Test frameworks
 '''
 
 class TestSet:
+    '''
+    AskUbuntu-formatted test/dev set
+    '''
     def __init__(self, test, questions):
         self.questions = questions
         self.entries = []
@@ -218,8 +248,10 @@ class TestSet:
                     'full': full
                 })
 
-
 class AndroidTestSet:
+    '''
+    Android-formatted test/dev set
+    '''
     def __init__(self, test_set, questions, num_examples = None):
         self.questions = questions
         self.entries = []

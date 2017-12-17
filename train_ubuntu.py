@@ -3,7 +3,7 @@ torch.manual_seed(0)
 
 from master_model import *
 from data import *
-from simple_models import *
+from architectures import *
 
 from tqdm import tqdm
 
@@ -146,8 +146,6 @@ def train(embedder,
 
         test_error = mean_reciprocal_rank
 
-        print('Epoch %d: train hinge loss = %f, test MAP = %f, test MRR = %f \n, precision@1 = %f, precision@5 = %f' % (epoch, final_loss / loss_denominator, mean_average_precision, mean_reciprocal_rank, precision_at_n[0], precision_at_n[4]))
-
         save_filename = os.path.join(save_dir, 'epoch%d-loss%f-map%f.pkl' % (epoch, test_error, mean_average_precision))
         fig_filename = os.path.join(save_dir, 'epoch%d-loss%f-vectors.png' % (epoch, test_error))
 
@@ -157,7 +155,7 @@ def train(embedder,
         if test_error > best_loss:
             torch.save(full_embedder, best_filename)
 
-        print('Epoch %d: train hinge loss %f, test MRR %0.1f' % (epoch, final_loss / loss_denominator, int(test_error * 1000) / 10.0))
+        print('Epoch %d: train hinge loss = %f, test MAP = %f, test MRR = %f \n, precision@1 = %f, precision@5 = %f' % (epoch, final_loss / loss_denominator, mean_average_precision, mean_reciprocal_rank, precision_at_n[0], precision_at_n[4]))
 
 
 cnn_model = CNN()

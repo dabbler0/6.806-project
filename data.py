@@ -2,6 +2,8 @@ import torch
 from torch.utils.data import *
 from tqdm import tqdm
 
+from torch.autograd import Variable
+
 word_embedding_size = 202
 
 '''
@@ -22,20 +24,20 @@ class Vocabulary:
             with open(corpus_fname) as corpus:
                 for line in corpus:
                     qid, title, body = line.split('\t')
-                    words = [x.lower() for x in title.split(' ') + body.split(' ')]
+                    words = [x.lower().strip() for x in title.split(' ') + body.split(' ')]
                     prune_candidates.update(words)
 
         frequencies = {}
         with open(unprune_corpus) as corpus:
             for line in corpus:
                 qid, title, body = line.split('\t')
-                words = [x.lower() for x in title.split(' ') + body.split(' ')]
+                words = [x.lower().strip() for x in title.split(' ') + body.split(' ')]
                 for word in words:
                     if word not in frequencies:
                         frequencies[word] = 0
                     frequencies[word] += 1
 
-        most_common_words = sorted(frequencies, key = lambda k: frequencies[k])
+        most_common_words = sorted(frequencies, key = lambda k: -frequencies[k])
 
         with open(fname) as vocab_file:
             for line in tqdm(vocab_file, desc='load vocab'):
@@ -60,6 +62,7 @@ class Vocabulary:
         number_added = 0
         for word in most_common_words:
             if word not in self.word_to_idx:
+                print('Adding word', word, frequencies[word])
                 # Add this word as a random vector
                 self.word_to_idx[word] = len(self.vocabulary)
                 self.vocabulary.append(word)
@@ -114,12 +117,12 @@ class QuestionBase:
                 self.all_qids.append(qid)
 
                 # Add dimension that flags whether we are in the title or the body
-                title = [vocabulary.to_idx(t.lower()) for t in title.split(' ')]
+                title = [vocabulary.to_idx(t.lower().strip()) for t in title.split(' ')]
                 if len(title) <= title_length:
                     title += [0] * (title_length - len(title))
                 title = title[:title_length]
 
-                body = [vocabulary.to_idx(t.lower()) for t in body.split(' ')]
+                body = [vocabulary.to_idx(t.lower().strip()) for t in body.split(' ')]
                 if len(body) <= body_length:
                     body += [0] * (body_length - len(body))
                 body = body[:body_length]
@@ -154,7 +157,7 @@ class QuestionBase:
             title_tensor = title_tensor.cuda()
             body_tensor = body_tensor.cuda()
 
-        return title_tensor, body_tensor
+        return Variable(title_tensor), Variable(body_tensor)
 
     def __getitem__(self, item):
         return self.questions[item]

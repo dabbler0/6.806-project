@@ -16,17 +16,19 @@ alpha = 0.1
 
 class BodyOnlyEmbedder(nn.Module):
     def __init__(self, vocabulary, body_embedding):
+        super(BodyOnlyEmbedder, self).__init__()
+
         self.word_embedding = nn.Embedding(vocabulary.embedding.size()[0], vocabulary.embedding.size()[1])
         self.word_embedding.weight.data = vocabulary.embedding
         self.word_embedding.weight.requires_grad = False
 
-        self.body_embedding = body_embdding
+        self.body_embedding = body_embedding
 
-        self.batch_norm = nn.BatchNorm1d(output_embedding_size)
+        self.batch_norm = nn.BatchNorm1d(body_embedding.output_size())
 
     def forward(self, pair):
         title, body = pair
-        return self.batch_norm(self.body_embedding(self.word_embedding(pair)))
+        return self.batch_norm(self.body_embedding(self.word_embedding(body), body.gt(0)))
 
 class FullEmbedder(nn.Module):
     def __init__(self, vocabulary, title_embedding, body_embedding, merge_strategy = 'mean', output_embedding_size = 0):
@@ -35,7 +37,8 @@ class FullEmbedder(nn.Module):
         # Word embedding
         self.word_embedding = nn.Embedding(vocabulary.embedding.size()[0], vocabulary.embedding.size()[1])
         self.word_embedding.weight.data = vocabulary.embedding
-        self.word_embedding.weight.requires_grad = False
+
+        #self.word_embedding.weight.requires_grad = False
 
         # Sentence embedding module
         self.title_embedding = title_embedding
@@ -62,8 +65,8 @@ class FullEmbedder(nn.Module):
         title, body = pair
 
         if self.body_embedding is not None:
-            title_encodings = self.title_embedding(self.word_embedding(title))
-            body_encodings = self.body_embedding(self.word_embedding(body))
+            title_encodings = self.title_embedding(self.word_embedding(title), title.gt(0))
+            body_encodings = self.body_embedding(self.word_embedding(body), body.gt(0))
 
             # Combine title and body encodings
             if self.merge_strategy == 'concatenate':
@@ -171,6 +174,12 @@ class TestFramework:
 
             self.question_body_vector = self.question_body_vector.cuda()
             self.full_body_vector = self.full_body_vector.cuda()
+
+        self.question_title_vector = Variable(self.question_title_vector)
+        self.full_title_vector = Variable(self.full_title_vector)
+
+        self.question_body_vector = Variable(self.question_body_vector)
+        self.full_body_vector = Variable(self.full_body_vector)
 
         self.question_vector = (self.question_title_vector, self.question_body_vector)
 

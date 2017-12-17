@@ -16,9 +16,8 @@ class CNN(nn.Module):
         self.pad_index = input_size - 2
         self.conv = nn.Conv1d(input_size, self.hidden_size, kernel_size=3, padding=1)
 
-    def forward(self, x):
+    def forward(self, x, padding_mask):
         x = x.transpose(1, 2)
-        padding_mask = x[:, self.pad_index, :]
         x = self.conv(x)
         x = F.relu(x)
         x = self.dropout(x)
@@ -34,87 +33,22 @@ class CNN(nn.Module):
             'hidden_size': self.hidden_size
         }
 
-class LSTMAverage(nn.Module):
-    def output_size(self):
-        return self.hidden_size * (2 if self.bidirectional else 1)
-
-    def __init__(self,
-                dropout = 0.3,
-                input_size = 202,
-                hidden_size = 240,
-                bidirectional = True):
-        super(LSTMAverage, self).__init__()
-
-        self.lstm = nn.LSTM(
-            input_size = input_size,
-            hidden_size = hidden_size,
-            num_layers = 1,
-            dropout = dropout,
-            bidirectional = bidirectional,
-            batch_first = True)
-
-        self.dropout = dropout
-        self.hidden_size = hidden_size
-        self.bidirectional = bidirectional
-        self.pad_index = input_size - 2
-
-    def signature(self):
-        return {
-            'type': 'LSTMAverage',
-            'dropout': self.dropout,
-            'hidden_size': self.hidden_size,
-            'bidirectional': self.bidirectional
-        }
-
-    def forward(self, batch):
-        padding_mask = batch[:, :, self.pad_index]
-
-        lengths = padding_mask.sum(1).long()
-
-        lengths, indices = lengths.sort(descending = True)
-
-        # batch x seq_length x word_embedding
-        batch = batch[indices.data, :, :]
-
-        # Pack sequence
-        packed_sequence = rnn.pack_padded_sequence(
-            batch,
-            lengths.data.cpu().numpy().tolist(),
-            batch_first = True
-        )
-
-        # LSTM
-        packed_output, (h, c) = self.lstm(packed_sequence)
-
-        # Unpack
-        raw_output, _lengths = rnn.pad_packed_sequence(packed_output, batch_first = True)
-
-        # batch is of size (batch) x (seq_length) x (word_embedding)
-        # word_embedding[-2] (that's index 200) is going to be equal to 0 when
-        # it is a padding sequence.
-        # (padding_mask is now of size (batch) x (seq_length))
-
-        # Get mean ignoring things past the end of the
-        # sentence.
-        output = raw_output.sum(1)
-        output = output / lengths.float().unsqueeze(1).expand_as(output)
-
-        # Re-sort output to match the input order.
-        _, inverse_indices = indices.sort()
-        output = output[inverse_indices.data, :]
-
-        return output
-
 class GRUDecoder(nn.Module):
     def __init__(self,
+                    embedding_layer,
                     dropout = 0.3,
                     hidden_size = 180,
                     output_size = 10000):
+
+        super(GRUDecoder, self).__init__()
         self.gru = nn.GRU(
             input_size = output_size,
             hidden_size = hidden_size,
             num_layers = 1
         )
+        self.embedding_layer = embedding_layer
+        self.dropout = dropout
+        self.hidden_size = hidden_size
 
         self.output = nn.Linear(hidden_size, output_size)
 
@@ -123,21 +57,21 @@ class GRUDecoder(nn.Module):
         mask = targets.gt(0)
         lengths = mask.sum(1)
 
-        _, indices = torch.sort(lengths, descending = True)
+        lengths, indices = torch.sort(lengths, descending = True)
         targets = targets[indices]
 
         # Targets here should be a list of indices.
         # Right-shift the targets by one
         shifted_targets = torch.cat(
             [
-                torch.zeros((target.size()[0], 1)).long(),
+                Variable(torch.zeros((targets.size()[0], 1)).long().cuda()),
                 targets
             ],
             dim = 1
         )[:, :-1]
 
         packed_sequence = rnn.pack_padded_sequence(
-            shifted_targets,
+            self.embedding_layer(shifted_targets),
             lengths.data.cpu().numpy().tolist(),
             batch_first = True
         )
@@ -161,12 +95,20 @@ class GRUDecoder(nn.Module):
 
         return case_loss.mean()
 
+    def signature(self):
+        return {
+            'type': 'GRUDecoder',
+            'dropout': self.dropout,
+            'hidden_size': self.hidden_size
+        }
+
 class GRUFoldedAverage(nn.Module):
     def __init__(self,
                 dropout = 0.3,
                 input_size = 202,
                 hidden_size = 180):
-        self.gru_average = GRUAverage(self, dropout, input_size, hidden_size, True)
+        super(GRUFoldedAverage, self).__init__()
+        self.gru_average = GRUAverage(dropout, input_size, hidden_size, True)
         self.hidden_size = hidden_size
 
     def output_size(self):
@@ -178,8 +120,8 @@ class GRUFoldedAverage(nn.Module):
             'gru': self.gru_average.signature()
         }
 
-    def forward(self, batch):
-        result = self.gru_average(batch)
+    def forward(self, batch, padding_mask):
+        result = self.gru_average(batch, padding_mask)
         forward = result[:, :self.hidden_size]
         backward = result[:, self.hidden_size:]
 
@@ -217,9 +159,7 @@ class GRUAverage(nn.Module):
             'bidirectional': self.bidirectional
         }
 
-    def forward(self, batch):
-        padding_mask = batch[:, :, self.pad_index]
-
+    def forward(self, batch, padding_mask):
         lengths = padding_mask.sum(1).long()
 
         lengths, indices = lengths.sort(descending = True)
@@ -300,12 +240,10 @@ class AttentionIsAllYouNeed(nn.Module):
             'dropout_value': self.dropout_value
         }
 
-    def forward(self, batch):
+    def forward(self, batch, padding_mask):
         # batch will be of size (batch_size) x (seq_length) x (embedding_size)
         # We will perform a self-attention embedding.
         # We want to compute (head) keys, values and queries for each word.
-
-        padding_mask = batch[:, :, self.pad_index]
 
         key_size, value_size, heads = self.key_size, self.value_size, self.heads
 

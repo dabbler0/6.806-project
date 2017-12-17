@@ -41,8 +41,8 @@ def test(filename,
 
 def test_transfer(filename,
          before_domain = True,
-         dev_pos_txt = 'android/dev.pos.txt',
-         dev_neg_txt = 'android/dev.neg.txt',
+         dev_pos_txt = 'android/test.pos.txt',
+         dev_neg_txt = 'android/test.neg.txt',
          title_length = 40,
          body_length = 100,
          test_batch_size = 10,
@@ -52,6 +52,8 @@ def test_transfer(filename,
          test_set = 'askubuntu/test.txt'):
 
     full_embedder = torch.load(filename)
+    if type(full_embedder) is tuple:
+        _, full_embedder = full_embedder
     vocabulary = Vocabulary(vectors, [ubuntu_questions_filename, android_questions_filename], android_questions_filename)
 
     android_questions = QuestionBase(android_questions_filename, vocabulary, title_length, body_length)
@@ -85,4 +87,6 @@ def test_unsupervised(filename,
 
 
 #test('models/cnn-1/best.pkl')
-test_transfer('/home/anthony/Data/large/scratch-models/models/gru-direct-transfer/best.pkl')
+#test_transfer('models/gru-direct-transfer-fixed/best.pkl')
+#test_transfer('models/gru-direct-transfer-fixed/epoch13-loss0.585714.pkl')
+test_transfer('models/domain-adaptation-gru-best/epoch13-loss0.645168.pkl')

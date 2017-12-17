@@ -109,6 +109,8 @@ def train(embedder,
         master.train()
 
         for i, batch in enumerate(tqdm(train_loader)):
+            optimizer.zero_grad()
+
             if cuda:
                 batchify = lambda v: Variable(torch.stack(v).cuda())
             else:
@@ -161,10 +163,10 @@ def train(embedder,
 unified = GRUAverage(input_size = 302, hidden_size = 190)
 train(
     embedder = unified,
-    save_dir = 'models/gru-direct-transfer',
-    batch_size = 100,
+    save_dir = 'models/gru-direct-transfer-fixed',
+    batch_size = 80,
     test_batch_size = 10,
-    lr = 1e-4,
+    lr = 3e-4,
 
     title_length = 40,
     negative_samples = 20,

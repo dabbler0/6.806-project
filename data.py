@@ -10,7 +10,7 @@ word_embedding_size = 202
 Vocabulary and tokenizers
 '''
 class Vocabulary:
-    def __init__(self, fname, prune_corpora, additional_words = 500, **keyword_parameters):
+    def __init__(self, fname, prune_corpora, additional_words = 500, unprune_corpus = None):
         # Token 0 is the padding token.
         # Token 1 is the unknown token.
         self.vocabulary = ['__EOS__', '__UNK__']
@@ -28,8 +28,7 @@ class Vocabulary:
                     prune_candidates.update(words)
 
         frequencies = {}
-        if 'unprune_corpus' in keyword_parameters:
-            unprune_corpus = keyword_parameters['unprune_corpus']
+        if unprune_corpus is not None:
             with open(unprune_corpus) as corpus:
                 for line in corpus:
                     qid, title, body = line.split('\t')
@@ -39,7 +38,7 @@ class Vocabulary:
                             frequencies[word] = 0
                         frequencies[word] += 1
 
-        most_common_words = sorted(frequencies, key = lambda k: -frequencies[k])
+            most_common_words = sorted(frequencies, key = lambda k: -frequencies[k])
 
         with open(fname) as vocab_file:
             for line in tqdm(vocab_file, desc='load vocab'):
@@ -61,21 +60,22 @@ class Vocabulary:
                     self.vocabulary.append(word)
                     self.embedding.append(vector)
 
-        number_added = 0
-        for word in most_common_words:
-            if word not in self.word_to_idx:
-                print('Adding word', word, frequencies[word])
-                # Add this word as a random vector
-                self.word_to_idx[word] = len(self.vocabulary)
-                self.vocabulary.append(word)
-                self.embedding.append(
-                    torch.Tensor(len(self.embedding[0]) - 2).uniform_().numpy().tolist()
-                    + [1, 0]
-                )
+        if unprune_corpus is not None:
+            number_added = 0
+            for word in most_common_words:
+                if word not in self.word_to_idx:
+                    print('Adding word', word, frequencies[word])
+                    # Add this word as a random vector
+                    self.word_to_idx[word] = len(self.vocabulary)
+                    self.vocabulary.append(word)
+                    self.embedding.append(
+                        torch.Tensor(len(self.embedding[0]) - 2).uniform_().numpy().tolist()
+                        + [1, 0]
+                    )
 
-                number_added += 1
-                if number_added >= additional_words:
-                    break
+                    number_added += 1
+                    if number_added >= additional_words:
+                        break
 
         self.embedding = torch.Tensor(self.embedding)
 

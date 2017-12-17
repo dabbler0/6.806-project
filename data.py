@@ -134,7 +134,7 @@ class QuestionBase:
         # selection
         self.all_qids = torch.LongTensor(self.all_qids)
 
-    def get_random_batch(self, batch_size, cuda = True):
+    def get_random_batch_and_qids(self, batch_size, cuda = True):
         # Get batch_size random indices into the qids tensor
         indices = torch.floor(torch.Tensor(batch_size).uniform_() * self.all_qids.size()[0]).long()
 
@@ -157,7 +157,10 @@ class QuestionBase:
             title_tensor = title_tensor.cuda()
             body_tensor = body_tensor.cuda()
 
-        return Variable(title_tensor), Variable(body_tensor)
+        return qids, (Variable(title_tensor), Variable(body_tensor))
+
+    def get_random_batch(self, batch_size, cuda = True):
+        return self.get_random_batch_and_qids(batch_size, cuda)[1]
 
     def __getitem__(self, item):
         return self.questions[item]

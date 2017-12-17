@@ -37,25 +37,29 @@ class GRUDecoder(nn.Module):
     def __init__(self,
                     embedding_layer,
                     dropout = 0.3,
-                    hidden_size = 180,
+                    input_size = 302,
+                    hidden_size = 100,
                     output_size = 10000):
 
         super(GRUDecoder, self).__init__()
         self.gru = nn.GRU(
-            input_size = output_size,
+            dropout = dropout,
+            input_size = input_size,
             hidden_size = hidden_size,
-            num_layers = 1
+            num_layers = 1,
+            batch_first = True,
         )
         self.embedding_layer = embedding_layer
         self.dropout = dropout
         self.hidden_size = hidden_size
 
         self.output = nn.Linear(hidden_size, output_size)
+        self.vocab_size = output_size
 
     def forward(self, encodings, targets):
         # Pack the targets
         mask = targets.gt(0)
-        lengths = mask.sum(1)
+        lengths = mask.long().sum(1)
 
         lengths, indices = torch.sort(lengths, descending = True)
         targets = targets[indices]
@@ -79,21 +83,23 @@ class GRUDecoder(nn.Module):
         # Feed packed sequence and encodings
         output, hn = self.gru(packed_sequence, encodings.unsqueeze(0))
 
-        output = rnn.pad_packed_sequence(output)
+        output, _ = rnn.pad_packed_sequence(output, batch_first = True)
+
+        seq_len = output.size()[1]
 
         # Apply output. This has (batch_size) x (seq_length) x (vocab_size)
-        predictions = F.log_softmax(self.output(output))
+        predictions = F.log_softmax(self.output(output).view(-1, self.vocab_size)).view(-1, seq_len, self.vocab_size)
 
         # Select wanted indices
-        losses = torch.gather(predictions, 2, targets.unsqueeze(2))
+        losses = torch.gather(predictions, 2, targets[:, :seq_len].unsqueeze(2)).squeeze()
 
         # Mask
-        masked_losses = losses * mask
+        masked_losses = losses * mask[:, :seq_len].float()
 
         # Mean over each sentence and then over cases
-        case_loss = masked_losses.sum(1) / lengths
+        case_loss = masked_losses.sum(1) / lengths.float()
 
-        return case_loss.mean()
+        return -case_loss.mean()
 
     def signature(self):
         return {
@@ -160,9 +166,9 @@ class GRUAverage(nn.Module):
         }
 
     def forward(self, batch, padding_mask):
-        lengths = padding_mask.sum(1).long()
+        lengths = padding_mask.long().sum(1)
 
-        lengths, indices = lengths.sort(descending = True)
+        lengths, indices = lengths.sort(0, descending = True)
 
         # batch x seq_length x word_embedding
         batch = batch[indices.data, :, :]

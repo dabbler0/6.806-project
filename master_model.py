@@ -20,7 +20,7 @@ class BodyOnlyEmbedder(nn.Module):
 
         self.word_embedding = nn.Embedding(vocabulary.embedding.size()[0], vocabulary.embedding.size()[1])
         self.word_embedding.weight.data = vocabulary.embedding
-        self.word_embedding.weight.requires_grad = False
+        #self.word_embedding.weight.requires_grad = False
 
         self.body_embedding = body_embedding
 
@@ -294,43 +294,45 @@ class AndroidTestFramework:
         self.cos_similarity = nn.CosineSimilarity(dim=2, eps=1e-6)
         self.AUC = AUCMeter()
 
+        self.visualize_batch = self.test_set.questions.get_random_batch(200)
+
     def metrics(self, embedder):
         # Get embeddings for all the questions
         # (cases) x (sent_embedding_size)
         self.AUC.reset()
         for i, batch in enumerate(tqdm(self.test_loader)):
 
-            self.question_title_vector = torch.LongTensor([
+            self.question_title_vector = Variable(torch.LongTensor([
                 self.test_set.questions[x][0] for x in batch['q']
-            ]).cuda()
+            ]).cuda())
 
-            self.question_body_vector = torch.LongTensor([
+            self.question_body_vector = Variable(torch.LongTensor([
                 self.test_set.questions[x][1] for x in batch['q']
-            ]).cuda()
+            ]).cuda())
 
             # LongTensor of (cases) x (num_full) x (trunc_length)
-            self.full_title_vector = torch.LongTensor([
+            self.full_title_vector = Variable(torch.LongTensor([
                 [self.test_set.questions[y][0] for y in x]
                 for x in batch['full']
-            ]).cuda().transpose(0, 1).contiguous()
+            ]).cuda().transpose(0, 1).contiguous())
 
 
-            self.full_body_vector = torch.LongTensor([
+            self.full_body_vector = Variable(torch.LongTensor([
                 [self.test_set.questions[y][1] for y in x]
                 for x in batch['full']
-            ]).cuda().transpose(0, 1).contiguous()
+            ]).cuda().transpose(0, 1).contiguous())
 
             # LongTensor of (cases) x (num_full) x (trunc_length)
-            self.similar_title_vector = torch.LongTensor([
+            self.similar_title_vector = Variable(torch.LongTensor([
                 [self.test_set.questions[y][0] for y in x]
                 for x in batch['similar']
-            ]).cuda().transpose(0, 1).contiguous()
+            ]).cuda().transpose(0, 1).contiguous())
 
 
-            self.similar_body_vector = torch.LongTensor([
+            self.similar_body_vector = Variable(torch.LongTensor([
                 [self.test_set.questions[y][1] for y in x]
                 for x in batch['similar']
-            ]).cuda().transpose(0, 1).contiguous()
+            ]).cuda().transpose(0, 1).contiguous())
 
             self.question_vector = (self.question_title_vector, self.question_body_vector)
 
@@ -381,7 +383,7 @@ class AndroidTestFramework:
 
 
     def visualize_embeddings(self, embedder, filename):
-        question_embedding = embedder(self.question_vector)
+        question_embedding = embedder(self.visualize_batch)
         plt.matshow(question_embedding.data.cpu().numpy())
         plt.savefig(filename)
 

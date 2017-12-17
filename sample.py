@@ -29,18 +29,19 @@ def sample(full_embedder,
             output,
             title_length = 40,
             body_length = 100,
+            num_points = 100,
             vectors = 'askubuntu/vector/vectors_pruned.200.txt',
-            questions_filename = 'askubuntu/text_tokenized.txt',
-            dev_set = 'askubuntu/dev.txt'):
+            questions_filename = 'askubuntu/text_tokenized.txt'):
 
-    vocabulary = Vocabulary(vectors)
+    vocabulary = Vocabulary(vectors, [questions_filename], questions_filename)
     questions = QuestionBase(questions_filename, vocabulary, title_length, body_length)
 
-    tester = TestFramework(dev_set, questions, title_length, body_length)
+    #tester = TestFramework(dev_set, questions, title_length, body_length)
 
     # (samples) x (embedding_size)
-    vectors = tester.sample(
-        full_embedder
+    qids, batch = questions.get_random_batch_and_qids(num_points)
+    vectors = full_embedder(
+        batch
     )
 
     # Dot product matrix
@@ -70,10 +71,39 @@ def sample(full_embedder,
     plt.figure(figsize=(20,20))
     plt.scatter(embedding[:, 0], embedding[:, 1])
 
-    for i, question in enumerate(x['q'] for x in tester.test_set.entries):
-        plt.annotate(qdict[question], (embedding[i, 0], embedding[i, 1]))
+    top_side = []
+    bottom_side = []
+
+    for i, question in enumerate(qids):
+        plt.annotate(len(qdict[question].split(' ')), (embedding[i, 0], embedding[i, 1]))
+
+        if embedding[i, 0] > 0:
+            top_side.append(qdict[question].split(' ')[0])
+        else:
+            bottom_side.append(qdict[question].split(' ')[0])
+
+    print(top_side)
+    print(bottom_side)
+
+    tc = {}
+    for x in top_side:
+        if x not in tc:
+            tc[x] = 0
+        tc[x] += 1
+    bc = {}
+    for x in bottom_side:
+        if x not in bc:
+            bc[x] = 0
+        bc[x] += 1
+
+    print(tc)
+    print(bc)
 
     plt.savefig(output)
 
 
-sample(torch.load('models/best-gru-model/best.pkl'), 'models/tsne-plot.png')
+#sample(torch.load('models/best-gru-model/best.pkl'), 'models/tsne-plot.png')
+sample(torch.load('models/gru-summarizer-fixed/best.pkl')[0], 'models/summarizer-tsne-plot.png',
+    vectors = 'glove/glove.840B.300d.txt',
+    questions_filename = 'Android/corpus.tsv',
+    num_points = 500)

@@ -94,12 +94,17 @@ def train(
         decoder.train()
 
         # Some arbitrary batch sizes
-        for _ in range(100):
+        for _ in tqdm(range(100), total=100, desc='batches'):
             optimizer.zero_grad()
 
             titles, bodies = questions.get_random_batch(batch_size)
 
             loss = decoder(full_embedder((None, bodies)), titles)
+
+            final_loss += loss.data[0]
+            loss_denominator += 1
+
+            loss.backward()
 
             optimizer.step()
 
@@ -114,17 +119,17 @@ def train(
 
         tester.visualize_embeddings(full_embedder, fig_filename)
 
-        torch.save(full_embedder, save_filename)
+        torch.save((full_embedder, decoder), save_filename)
         if AUC_metric > best_loss:
-            torch.save(full_embedder, best_filename)
+            torch.save((full_embedder, decoder), best_filename)
 
         print('Epoch %d: train hinge loss %f, test MAP %0.1f' % (epoch, final_loss / loss_denominator, int(AUC_metric* 1000) / 10.0))
 
 train(
-    save_dir = 'models/gru-direct-transfer',
+    save_dir = 'models/gru-summarizer-dropout',
     batch_size = 100,
     test_batch_size = 10,
-    lr = 1e-4,
+    lr = 3e-4,
 
     title_length = 40,
 

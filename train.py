@@ -26,7 +26,7 @@ def train(embedder,
             margin = 0.1,
             epochs = 50,
             lr = 1e-4,
-            cuda = False,
+            cuda = True,
             body_embedder = None,
             merge_strategy = 'mean',
             negative_samples = 20,
@@ -37,7 +37,7 @@ def train(embedder,
             train_set = 'askubuntu/train_random.txt',
             dev_set = 'askubuntu/dev.txt'):
 
-    vocabulary = Vocabulary(vectors, [questions_filename])
+    vocabulary = Vocabulary(vectors, [questions_filename], questions_filename)
     questions = QuestionBase(questions_filename, vocabulary, title_length, body_length)
 
     train_loader = DataLoader(
@@ -160,12 +160,12 @@ def train(embedder,
         print('Epoch %d: train hinge loss %f, test MRR %0.1f' % (epoch, final_loss / loss_denominator, int(test_error * 1000) / 10.0))
 
 
-#cnn_model = CNN()
-gru_model = GRUAverage(hidden_size = 190, bidirectional = True, input_size = 202)
+cnn_model = CNN()
+#gru_model = GRUAverage(hidden_size = 190, bidirectional = True, input_size = 202)
 
 train(
-    gru_model,
-    'models/gru-1',
+    cnn_model,
+    'models/cnn-1',
     batch_size = 50,
     lr = 1e-4,
 
@@ -175,7 +175,7 @@ train(
 
     vectors = 'askubuntu/vector/vectors_pruned.200.txt',
 
-    body_embedder = gru_model,
+    body_embedder = cnn_model,
     body_length = 100,
     merge_strategy = 'mean',
 

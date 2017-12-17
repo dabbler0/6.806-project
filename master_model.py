@@ -15,12 +15,12 @@ import numpy as np
 alpha = 0.1
 
 class BodyOnlyEmbedder(nn.Module):
-    def __init__(self, vocabulary, body_embedding):
+    def __init__(self, vocabulary, body_embedding, train_embeddings = False):
         super(BodyOnlyEmbedder, self).__init__()
 
         self.word_embedding = nn.Embedding(vocabulary.embedding.size()[0], vocabulary.embedding.size()[1])
         self.word_embedding.weight.data = vocabulary.embedding
-        #self.word_embedding.weight.requires_grad = False
+        self.word_embedding.weight.requires_grad = train_embeddings
 
         self.body_embedding = body_embedding
 
@@ -31,14 +31,14 @@ class BodyOnlyEmbedder(nn.Module):
         return self.batch_norm(self.body_embedding(self.word_embedding(body), body.gt(0)))
 
 class FullEmbedder(nn.Module):
-    def __init__(self, vocabulary, title_embedding, body_embedding, merge_strategy = 'mean', output_embedding_size = 0):
+    def __init__(self, vocabulary, title_embedding, body_embedding, merge_strategy = 'mean', output_embedding_size = 0, train_embeddings = False):
         super(FullEmbedder, self).__init__()
 
         # Word embedding
         self.word_embedding = nn.Embedding(vocabulary.embedding.size()[0], vocabulary.embedding.size()[1])
         self.word_embedding.weight.data = vocabulary.embedding
 
-        #self.word_embedding.weight.requires_grad = False
+        self.word_embedding.weight.requires_grad = train_embeddings
 
         # Sentence embedding module
         self.title_embedding = title_embedding

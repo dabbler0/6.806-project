@@ -46,4 +46,4 @@ def test(filename,
 
 
 
-test('models/cnn_paper_3/epoch20-loss0.710136-map0.574699.pkl')
+test('models/cnn-1/best.pkl')

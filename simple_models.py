@@ -56,6 +56,8 @@ class GRUDecoder(nn.Module):
         self.dropout = dropout
         self.hidden_size = hidden_size
 
+        self.initial_dropout = nn.Dropout(dropout)
+
         self.output = nn.Linear(hidden_size, output_size)
         self.vocab_size = output_size
 
@@ -77,14 +79,23 @@ class GRUDecoder(nn.Module):
             dim = 1
         )[:, :-1]
 
+        embedded = self.embedding_layer(shifted_targets)
+
+        encoding_size = encodings.size()[1]
+
         packed_sequence = rnn.pack_padded_sequence(
-            self.embedding_layer(shifted_targets),
+            torch.cat([
+                embedded,
+                encodings.unsqueeze(1).expand(embedded.size()[0], embedded.size()[1], encoding_size)
+            ], dim = 2),
             lengths.data.cpu().numpy().tolist(),
             batch_first = True
         )
 
         # Feed packed sequence and encodings
-        output, hn = self.gru(packed_sequence, encodings.unsqueeze(0))
+        output, hn = self.gru(packed_sequence)#,
+        #   self.initial_dropout(encodings.unsqueeze(0))
+        #)
 
         output, _ = rnn.pad_packed_sequence(output, batch_first = True)
 
@@ -98,6 +109,8 @@ class GRUDecoder(nn.Module):
 
         # Mask
         masked_losses = losses * mask[:, :seq_len].float()
+
+        #print(masked_losses)
 
         # Mean over each sentence and then over cases
         case_loss = masked_losses.sum(1) / lengths.float()
@@ -119,6 +132,7 @@ class GRUFoldedAverage(nn.Module):
         super(GRUFoldedAverage, self).__init__()
         self.gru_average = GRUAverage(dropout, input_size, hidden_size, True)
         self.hidden_size = hidden_size
+        self.linear = nn.Linear(2 * hidden_size, hidden_size)
 
     def output_size(self):
         return self.hidden_size
@@ -130,11 +144,7 @@ class GRUFoldedAverage(nn.Module):
         }
 
     def forward(self, batch, padding_mask):
-        result = self.gru_average(batch, padding_mask)
-        forward = result[:, :self.hidden_size]
-        backward = result[:, self.hidden_size:]
-
-        return forward + backward
+        return F.relu(self.linear(self.gru_average(batch, padding_mask)))
 
 class GRUAverage(nn.Module):
     def __init__(self,

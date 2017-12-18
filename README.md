@@ -35,6 +35,11 @@ Running Body-like-Title unsupervised neural model
 
 Run `train_body-like-title_alignment.py`, replacing the arguments in the main block with whatever hyperparameters you choose.
 
+Running TF-IDF baseline
+------------------------
+
+Run `tfidf.py`.
+
 Auxiliary Tools
 ---------------
 

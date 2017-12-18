@@ -159,7 +159,7 @@ def train(
 if __name__ == '__main__':
     # The best model had these hyperparameters.
     train(
-        save_dir = 'models/gru-dual-severe',
+        save_dir = 'models/gru-dual-fixed',
         batch_size = 100,
         test_batch_size = 10,
         lr = 3e-4,

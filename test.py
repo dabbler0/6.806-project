@@ -55,7 +55,7 @@ def test_transfer(filename,
          test_batch_size = 10,
          vectors = 'glove/glove.840B.300d.txt',
          ubuntu_questions_filename = 'askubuntu/text_tokenized.txt',
-         android_questions_filename = 'Android/corpus.tsv',
+         android_questions_filename = 'android/corpus.tsv',
          test_set = 'askubuntu/test.txt'):
 
     # Direct transfer models also store the domain classifier,
@@ -86,7 +86,7 @@ def test_unsupervised(filename,
          test_batch_size = 10,
          vectors = 'glove/glove.840B.300d.txt',
          ubuntu_questions_filename = 'askubuntu/text_tokenized.txt',
-         android_questions_filename = 'Android/corpus.tsv',
+         android_questions_filename = 'android/corpus.tsv',
          test_set = 'askubuntu/test.txt'):
 
     full_embedder = torch.load(filename)
@@ -104,4 +104,5 @@ if __name__ == '__main__':
     #test('models/cnn-1/best.pkl')
     #test_transfer('models/gru-direct-transfer-fixed/best.pkl')
     #test_transfer('models/gru-direct-transfer-fixed/epoch13-loss0.585714.pkl')
-    test_transfer('models/domain-adaptation-gru-best/epoch13-loss0.645168.pkl')
+    #test_transfer('models/domain-adaptation-gru-best/epoch13-loss0.645168.pkl')
+    test_unsupervised('models/gru-dual-fixed/best.pkl')

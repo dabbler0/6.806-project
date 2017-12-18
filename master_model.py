@@ -13,6 +13,7 @@ import numpy as np
 
 from data import *
 from meter import *
+from scipy.sparse import csr_matrix, find
 
 import matplotlib
 matplotlib.use('Agg')
@@ -412,3 +413,60 @@ class AndroidTestFramework:
 
     def sample(self, embedder):
         return embedder(self.question_vector)
+
+class TFIDFTestFramework:
+    '''
+    Framework for testing TFIDF or other CountVectorizer-like
+    models.
+    '''
+    def __init__(self, test, mapping, rep):
+        self.test_set = AndroidTestSet(test, False)
+
+        self.mapping = mapping
+        self.rep = rep
+
+        self.cos_similarity = nn.CosineSimilarity(dim=1, eps=1e-6)
+        self.AUC = AUCMeter()
+
+    def metrics(self):
+        self.AUC.reset()
+
+        for i, entry in enumerate(self.test_set):
+            if i % 10 == 0:
+                print i
+
+            combined = entry['full'][:entry['full_mask']] + entry['similar'][:entry['similar_mask']]
+
+            row, col, values = find(self.rep[self.mapping[entry['q']]])
+
+            combined_tensor = torch.stack(
+                (torch.IntTensor(row), torch.IntTensor(col)),
+                dim=0
+            ).long()
+
+            target_review = torch.sparse.FloatTensor(
+                    combined_tensor,
+                    torch.FloatTensor(values),
+                    torch.Size([1,79066])
+            ).to_dense()
+
+            longing = np.zeros(len(combined))
+            for i, review in enumerate(combined):
+                frow, fcol, fvalues = find(self.rep[self.mapping[review]])
+                full_tensor = torch.stack(
+                        (torch.IntTensor(frow), torch.IntTensor(fcol)), dim=0).long()
+                full_review = torch.sparse.FloatTensor(full_tensor,
+                        torch.FloatTensor(fvalues), torch.Size([1,79066])).to_dense()
+                valuation = self.cos_similarity(target_review, full_review).numpy()
+                longing[i] = valuation
+
+            comb_similarities = torch.FloatTensor(longing)
+
+            comb_target = torch.FloatTensor(
+                np.concatenate(([0 for _ in range(entry['full_mask'])],
+                    [1 for _ in range(entry['similar_mask'])]))
+            )
+
+            self.AUC.add(comb_similarities, comb_target)
+
+        return self.AUC.value(.05)
